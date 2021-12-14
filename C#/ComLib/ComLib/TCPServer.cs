@@ -1,4 +1,4 @@
-﻿namespace ComTCP
+﻿namespace ComLib
 {
     public class TCPServer
     {
