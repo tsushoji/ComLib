@@ -36,24 +36,13 @@ namespace ComTCP
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
         /// <param name="receivedData">受信データ</param>
-        public delegate void ReceiveEventHandler(object sender, byte[] receivedData);
+        /// <param name="sendData">送信データ</param>
+        public delegate void ReceiveEventHandler(object sender, byte[] receivedData, ref byte[] sendData);
 
         /// <summary>
         /// データ受信イベント
         /// </summary>
         public event ReceiveEventHandler OnServerReceiveData;
-
-        /// <summary>
-        /// データ送信イベントハンドラー
-        /// </summary>
-        /// <param name="sender">イベント発生オブジェクト</param>
-        /// <param name="receivedData">データ</param>
-        public delegate byte[] SendEventHandler(object sender, byte[] data);
-
-        /// <summary>
-        /// データ送信イベント
-        /// </summary>
-        public event SendEventHandler OnSeverSendData;
 
         /// <summary>
         /// 切断イベントハンドラー
@@ -81,16 +70,16 @@ namespace ComTCP
         public event ConnectedEventHandler OnServerConnected;
 
         /// <summary>
-        /// 送信完了イベントハンドラー
+        /// 送信イベントハンドラー
         /// </summary>
         /// <param name="byteSize">送信バイト数</param>
         /// <param name="sendEndPoint">送信エンドポイント</param>
-        public delegate void SendCompletlyEventHandler(int byteSize, EndPoint sendEndPoint);
+        public delegate void SendEventHandler(int byteSize, EndPoint sendEndPoint);
 
         /// <summary>
-        /// 送信完了イベント
+        /// 送信イベント
         /// </summary>
-        public event SendCompletlyEventHandler OnServerSendCompletly;
+        public event SendEventHandler OnServerSend;
 
         /// <summary>
         /// サーバー処理開始
@@ -183,11 +172,13 @@ namespace ComTCP
                     var receivedData = new byte[bytes];
                     Array.Copy(state.Buffer, receivedData, bytes);
 
+                    var sendData = new byte[StateObject.BufferSize];
+
                     // データ受信イベント発生
-                    OnServerReceiveData?.Invoke(this, receivedData);
+                    OnServerReceiveData?.Invoke(this, receivedData, ref sendData);
 
                     // クライアントに送信
-                    Send(clientSocket, receivedData);
+                    Send(clientSocket, sendData);
 
                     // データ受信開始
                     clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
@@ -252,10 +243,7 @@ namespace ComTCP
         {
             try
             {
-                //データ送信イベント発生
-                var sendData = OnSeverSendData?.Invoke(this, data);
-
-                clientSocket.BeginSend(sendData, 0, sendData.Length, 0, new AsyncCallback(SendCallback), clientSocket);
+                clientSocket.BeginSend(data, 0, data.Length, 0, new AsyncCallback(SendCallback), clientSocket);
             }
             catch (SocketException e)
             {
@@ -288,7 +276,7 @@ namespace ComTCP
                 // クライアントソケットへのデータ送信処理を完了する
                 var clientSocket = asyncResult.AsyncState as Socket;
                 var byteSize = clientSocket.EndSend(asyncResult);
-                OnServerSendCompletly?.Invoke(byteSize, clientSocket.RemoteEndPoint);
+                OnServerSend?.Invoke(byteSize, clientSocket.RemoteEndPoint);
             }
             catch (Exception e)
             {

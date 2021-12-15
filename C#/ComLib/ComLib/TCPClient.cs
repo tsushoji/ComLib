@@ -27,6 +27,18 @@ namespace ComTCP
         public byte[] Buffer { get; } = new byte[BufferSize];
 
         /// <summary>
+        /// 接続イベントハンドラー
+        /// </summary>
+        /// <param name="sender">イベント発生オブジェクト</param>
+        /// <param name="receivedData">受信データ</param>
+        public delegate void ConnectEventHandler(EventArgs e);
+
+        /// <summary>
+        /// 接続イベント
+        /// </summary>
+        public event ConnectEventHandler OnClientConnected;
+
+        /// <summary>
         /// データ受信イベントハンドラー
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
@@ -36,7 +48,7 @@ namespace ComTCP
         /// <summary>
         /// データ受信イベント
         /// </summary>
-        public event ReceiveEventHandler OnServerReceiveData;
+        public event ReceiveEventHandler OnClientReceiveData;
 
         /// <summary>
         /// 接続
@@ -51,12 +63,12 @@ namespace ComTCP
                 var ipAddress = IPAddress.Parse(ip);
                 ServerIPEndPoint = new IPEndPoint(ipAddress, port);
 
-                // サーバーと接続
+                // リモートホスト接続
                 Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 Socket.Connect(ServerIPEndPoint);
 
-                // データ受信開始
-                Socket.BeginReceive(Buffer, 0, BufferSize, SocketFlags.None, new AsyncCallback(ReceiveCallback), Socket);
+                // リモートホスト接続を開始
+                Socket.BeginConnect(ServerIPEndPoint, new AsyncCallback(ConnectCallback), Socket);
             }
             catch (Exception ex)
             {
@@ -65,21 +77,20 @@ namespace ComTCP
         }
 
         /// <summary>
-        /// 切断
+        /// 接続時の非同期コールバック処理
         /// </summary>
-        public void DisConnect()
+        /// <param name="asyncResult">接続結果</param>
+        private void ConnectCallback(IAsyncResult asyncResult)
         {
-            Socket?.Disconnect(false);
-            Socket?.Dispose();
-        }
+            // ソケットを取得
+            var clientSocket = asyncResult.AsyncState as Socket;
+            clientSocket.EndConnect(asyncResult);
 
-        /// <summary>
-        /// 送信
-        /// </summary>
-        /// <param name="sendData">データ</param>
-        public void Send(byte[] sendData)
-        {
-            Socket.Send(sendData);
+            // 接続イベント発生
+            OnClientConnected?.Invoke(new EventArgs());
+
+            // データ受信開始
+            Socket.BeginReceive(Buffer, 0, BufferSize, 0, new AsyncCallback(ReceiveCallback), Socket);
         }
 
         /// <summary>
@@ -88,6 +99,7 @@ namespace ComTCP
         /// <param name="asyncResult">受信結果</param>
         private void ReceiveCallback(IAsyncResult asyncResult)
         {
+            // ソケットを取得
             var socket = asyncResult.AsyncState as Socket;
 
             var byteSize = -1;
@@ -109,11 +121,29 @@ namespace ComTCP
                 Array.Copy(Buffer, receivedData, byteSize);
 
                 // データ受信イベント発生
-                OnServerReceiveData?.Invoke(this, receivedData);
+                OnClientReceiveData?.Invoke(this, receivedData);
 
                 // 再度受信を開始
-                socket.BeginReceive(this.Buffer, 0, this.Buffer.Length, SocketFlags.None, ReceiveCallback, socket);
+                socket.BeginReceive(this.Buffer, 0, this.Buffer.Length, 0, ReceiveCallback, socket);
             }
+        }
+
+        /// <summary>
+        /// 切断
+        /// </summary>
+        public void DisConnect()
+        {
+            Socket?.Disconnect(false);
+            Socket?.Dispose();
+        }
+
+        /// <summary>
+        /// 送信
+        /// </summary>
+        /// <param name="sendData">データ</param>
+        public void Send(byte[] sendData)
+        {
+            Socket.Send(sendData);
         }
     }
 }
