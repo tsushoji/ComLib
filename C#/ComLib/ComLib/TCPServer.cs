@@ -16,9 +16,19 @@ namespace ComTCP
         private readonly ManualResetEvent mre = new ManualResetEvent(false);
 
         /// <summary>
+        /// リッスンタスク
+        /// </summary>
+        private Task TaskListen { get; set; }
+
+        /// <summary>
         /// サーバーのエンドポイント
         /// </summary>
         public IPEndPoint IPEndPoint { get; private set; }
+
+        /// <summary>
+        /// 接続待機ループ実行中
+        /// </summary>
+        private bool RunningListen { get; set; } = false;
 
         /// <summary>
         /// サーバにacceptされていないクライアントからの接続要求を保持しておくキューの最大長
@@ -85,9 +95,9 @@ namespace ComTCP
         /// サーバー処理開始
         /// </summary>
         /// <param name="port">リッスンするポート</param>
-        public void StartListen(int port)
+        public void StartService(int port)
         {
-            Task.Factory.StartNew(() =>
+            TaskListen = Task.Factory.StartNew(() =>
             {
                 Run(port);
             });
@@ -109,11 +119,13 @@ namespace ComTCP
                 // ソケットをアドレスにバインド
                 listenerSocket.Bind(IPEndPoint);
 
+                RunningListen = true;
+
                 // 接続待機開始
                 listenerSocket.Listen(Backlog);
 
                 // 接続待機のループ
-                while (true)
+                while (RunningListen)
                 {
                     mre.Reset();
                     // 非同期ソケットを開始して、接続をリッスンする
@@ -290,6 +302,16 @@ namespace ComTCP
         /// </summary>
         public void EndService()
         {
+            RunningListen = false;
+
+            // 待機スレッドが進行するようにシグナルをセット
+            mre.Set();
+
+            TaskListen?.Wait();
+            TaskListen?.Dispose();
+
+            mre.Close();
+
             foreach (Socket clientSocket in ClientSockets)
             {
                 clientSocket?.Close();
