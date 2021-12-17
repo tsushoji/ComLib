@@ -92,28 +92,33 @@ namespace ComTCP
         public event SendEventHandler OnServerSend;
 
         /// <summary>
-        /// サーバー処理開始
+        /// 引数付きコンストラクタ
         /// </summary>
         /// <param name="port">リッスンするポート</param>
-        public void StartService(int port)
+        TCPServer(int port)
+        {
+            // IPエンドポイント作成
+            IPEndPoint = new IPEndPoint(IPAddress.Any, port);
+        }
+
+        /// <summary>
+        /// サーバー処理開始
+        /// </summary>
+        public void StartService()
         {
             TaskListen = Task.Factory.StartNew(() =>
             {
-                Run(port);
+                Run();
             });
         }
 
         /// <summary>
         /// サーバー起動
         /// </summary>
-        /// <param name="port">リッスンするポート</param>
-        private void Run(int port)
+        private void Run()
         {
             using (Socket listenerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
             {
-                // IPエンドポイント作成
-                IPEndPoint = new IPEndPoint(IPAddress.Any, port);
-
                 // 切断後、再接続を可能にする
                 listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 // ソケットをアドレスにバインド
