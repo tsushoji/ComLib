@@ -47,7 +47,8 @@ namespace ComTCP
         /// <param name="sender">イベント発生オブジェクト</param>
         /// <param name="receivedData">受信データ</param>
         /// <param name="sendData">送信データ</param>
-        public delegate void ReceiveEventHandler(object sender, byte[] receivedData, ref byte[] sendData);
+        /// <param name="isSendAll">全接続済みクライアントへ送信するか</param>
+        public delegate void ReceiveEventHandler(object sender, byte[] receivedData, ref byte[] sendData, ref bool isSendAll);
 
         /// <summary>
         /// データ受信イベント
@@ -191,11 +192,21 @@ namespace ComTCP
 
                     var sendData = new byte[StateObject.BufferSize];
 
-                    // データ受信イベント発生
-                    OnServerReceiveData?.Invoke(this, receivedData, ref sendData);
+                    bool isSendAll = false;
 
-                    // クライアントに送信
-                    Send(clientSocket, sendData);
+                    // データ受信イベント発生
+                    OnServerReceiveData?.Invoke(this, receivedData, ref sendData, ref isSendAll);
+
+                    if (isSendAll)
+                    {
+                        // 全接続済みクライアントへ送信
+                        SendAllClient(sendData);
+                    }
+                    else
+                    {
+                        // リクエストクライアントへ送信
+                        Send(clientSocket, sendData);
+                    }
 
                     // データ受信開始
                     clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
@@ -279,6 +290,18 @@ namespace ComTCP
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 全接続済みクライアントへのメッセージ送信処理
+        /// </summary>
+        /// <param name="data">データ</param>
+        private void SendAllClient(byte[] data)
+        {
+            foreach (var clientSocket in ClientSockets)
+            {
+                Send(clientSocket, data);
             }
         }
 
