@@ -1,6 +1,8 @@
-﻿using Prism.Commands;
+﻿using ComLibDemo.Models;
+using Prism.Commands;
 using Prism.Mvvm;
 using System;
+using System.Collections.ObjectModel;
 using System.Net;
 using System.Reflection;
 using System.Text;
@@ -10,24 +12,7 @@ namespace ComLibDemo.ViewModels
 {
     public class ServerTestWindowViewModel : BindableBase
     {
-        public string OutputTextBoxText
-        {
-            get
-            {
-                if (_outputText.Length < 1)
-                {
-                    return string.Empty;
-                }
-                return _outputText.ToString();
-            }
-
-            set
-            {
-                throw new Exception();
-            }
-        }
-
-        private StringBuilder _outputText = new StringBuilder();
+        public ObservableCollection<OutputTextModel> OutputMsgList { get; set; } = new ObservableCollection<OutputTextModel>();
 
         public string InputListenPortTextBoxText { get; set; } = string.Empty;
 
@@ -109,6 +94,8 @@ namespace ComLibDemo.ViewModels
 
             if (TCPServer != null)
             {
+                OutputMsgList.Add(new OutputTextModel(">>Dllが存在しません。"));
+
                 ServerService = Activator.CreateInstance(TCPServer, port);
                 return true;
             }
@@ -121,11 +108,15 @@ namespace ComLibDemo.ViewModels
             int port;
             if (!int.TryParse(InputListenPortTextBoxText, out port))
             {
+                OutputMsgList.Add(new OutputTextModel(">>数値でポートを設定してください。"));
+
                 return;
             }
 
             if (port < 0)
             {
+                OutputMsgList.Add(new OutputTextModel(">>正の数でポートを設定してください。"));
+
                 return;
             }
 
@@ -151,28 +142,28 @@ namespace ComLibDemo.ViewModels
             IsEnabledServerEndServiceButton = true;
         }
 
-        private void OnReceiveData(object sender, byte[] receivedData, ref byte[] sendData)
+        private void OnReceiveData(object sender, byte[] receivedData, ref byte[] sendData, ref bool isSendAll)
         {
-            _outputText.AppendLine("TCPServer:OnReceiveData start");
-            _outputText.AppendLine("TCPServer:OnReceiveData end");
+            OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceiveData start"));
+            OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceiveData end"));
         }
 
         private void OnDisconnected(object sender, EventArgs e, Exception ex)
         {
-            _outputText.AppendLine("TCPServer:OnDisconnected start");
-            _outputText.AppendLine("TCPServer:OnDisconnected end");
+            OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnDisconnected start"));
+            OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnDisconnected end"));
         }
 
         private void OnConnected(EventArgs e, EndPoint connectedEndPoint)
         {
-            _outputText.AppendLine("TCPServer:OnConnected start");
-            _outputText.AppendLine("TCPServer:OnConnected end");
+            OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnConnected end"));
+            OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnConnected end"));
         }
 
         private void OnSend(int byteSize, EndPoint sendEndPoint)
         {
-            _outputText.AppendLine("TCPServer:OnSend start");
-            _outputText.AppendLine("TCPServer:OnSend end");
+            OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnSend end"));
+            OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnSend end"));
         }
 
         private void OnEndService()

@@ -59,6 +59,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Models\OutputTextModel.cs" />
     <Compile Include="ViewModels\ClientTestWindowViewModel.cs" />
     <Compile Include="ViewModels\ServerTestWindowViewModel.cs" />
     <Compile Include="Views\ServerTestWindow.xaml.cs">
