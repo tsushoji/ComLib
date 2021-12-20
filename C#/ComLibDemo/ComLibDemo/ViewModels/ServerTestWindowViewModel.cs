@@ -5,7 +5,6 @@ using System;
 using System.Collections.ObjectModel;
 using System.Net;
 using System.Reflection;
-using System.Text;
 using static ComTCP.TCPServer;
 
 namespace ComLibDemo.ViewModels
@@ -90,15 +89,15 @@ namespace ComLibDemo.ViewModels
         {
             var asm = Assembly.LoadFrom("ComLib.dll");
             var module = asm.GetModule("ComLib.dll");
-            TCPServer = module.GetType("ComLib.TCPServer");
+            TCPServer = module.GetType("ComTCP.TCPServer");
 
             if (TCPServer != null)
             {
-                OutputMsgList.Add(new OutputTextModel(">>Dllが存在しません。"));
-
                 ServerService = Activator.CreateInstance(TCPServer, port);
                 return true;
             }
+
+            OutputMsgList.Add(new OutputTextModel(">>Dllが存在しません。"));
 
             return false;
         }
