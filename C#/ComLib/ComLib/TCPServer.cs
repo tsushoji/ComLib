@@ -95,7 +95,7 @@ namespace ComTCP
         /// 引数付きコンストラクタ
         /// </summary>
         /// <param name="port">リッスンするポート</param>
-        TCPServer(int port)
+        public TCPServer(int port)
         {
             // IPエンドポイント作成
             IPEndPoint = new IPEndPoint(IPAddress.Any, port);
