@@ -55,7 +55,8 @@ namespace ComTCP
         /// </summary>
         /// <param name="ip">IP</param>
         /// <param name="port">ポート</param>
-        public void Connect(string ip, int port)
+        /// <returns>接続可否</returns>
+        public bool Connect(string ip, int port)
         {
             try
             {
@@ -73,7 +74,18 @@ namespace ComTCP
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine(ex.Message);
+
+                // ソケット解放
+                Socket.Close();
+                Socket = null;
+
+                // サーバーエンドポイントを解放
+                ServerIPEndPoint = null;
+
+                return false;
             }
+
+            return true;
         }
 
         /// <summary>
@@ -141,9 +153,21 @@ namespace ComTCP
         /// 送信
         /// </summary>
         /// <param name="sendData">データ</param>
-        public void Send(byte[] sendData)
+        /// <returns>送信可否</returns>
+        public bool Send(byte[] sendData)
         {
-            Socket.Send(sendData);
+            try
+            {
+                Socket.Send(sendData);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+
+                return false;
+            }
+
+            return true;
         }
     }
 }
