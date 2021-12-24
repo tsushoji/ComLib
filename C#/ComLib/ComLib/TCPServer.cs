@@ -12,7 +12,7 @@ namespace ComTCP
         /// <summary>
         /// スレッド待機用
         /// </summary>
-        private readonly ManualResetEvent mre = new ManualResetEvent(false);
+        private ManualResetEvent Mre;
 
         /// <summary>
         /// リッスンタスク
@@ -119,6 +119,9 @@ namespace ComTCP
         {
             using (Socket listenerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
             {
+                // スレッド待機用
+                Mre = new ManualResetEvent(false);
+
                 // 切断後、再接続を可能にする
                 listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 // ソケットをアドレスにバインド
@@ -132,11 +135,11 @@ namespace ComTCP
                 // 接続待機のループ
                 while (RunningListen)
                 {
-                    mre.Reset();
+                    Mre.Reset();
                     // 非同期ソケットを開始して、接続をリッスンする
                     listenerSocket.BeginAccept(new AsyncCallback(AcceptCallback), listenerSocket);
                     // 接続があるまでスレッドを待機
-                    mre.WaitOne();
+                    Mre.WaitOne();
                 }
             }
         }
@@ -148,7 +151,7 @@ namespace ComTCP
         private void AcceptCallback(IAsyncResult asyncResult)
         {
             // 待機スレッドが進行するようにシグナルをセット
-            mre.Set();
+            Mre.Set();
 
             // ソケットを取得
             var listenerSocket = asyncResult.AsyncState as Socket;
@@ -317,10 +320,9 @@ namespace ComTCP
                 var byteSize = clientSocket.EndSend(asyncResult);
                 OnServerSend?.Invoke(byteSize, clientSocket.RemoteEndPoint);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                string msg = e.Message;
-                Console.Write(msg);
+                System.Diagnostics.Debug.WriteLine(ex.Message);
             }
         }
 
@@ -332,16 +334,19 @@ namespace ComTCP
             RunningListen = false;
 
             // 待機スレッドが進行するようにシグナルをセット
-            mre.Set();
+            Mre.Set();
 
             TaskListen?.Wait();
             TaskListen?.Dispose();
+            TaskListen = null;
 
-            mre.Close();
+            Mre?.Dispose();
+            Mre = null;
 
             foreach (Socket clientSocket in ClientSockets)
             {
                 clientSocket?.Close();
+                ClientSockets.Remove(clientSocket);
             }
         }
     }

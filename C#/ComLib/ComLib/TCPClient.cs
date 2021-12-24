@@ -75,12 +75,8 @@ namespace ComTCP
             {
                 System.Diagnostics.Debug.WriteLine(ex.Message);
 
-                // ソケット解放
-                Socket.Close();
-                Socket = null;
-
-                // サーバーエンドポイントを解放
-                ServerIPEndPoint = null;
+                // 切断
+                DisConnect();
 
                 return false;
             }
@@ -122,7 +118,7 @@ namespace ComTCP
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                System.Diagnostics.Debug.WriteLine(ex.Message);
                 return;
             }
 
@@ -145,8 +141,18 @@ namespace ComTCP
         /// </summary>
         public void DisConnect()
         {
-            Socket?.Disconnect(false);
-            Socket?.Dispose();
+            try
+            {
+                // ソケット終了
+                Socket?.Shutdown(SocketShutdown.Both);
+                Socket?.Disconnect(false);
+                Socket?.Dispose();
+                Socket = null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+            }
         }
 
         /// <summary>
