@@ -136,7 +136,7 @@ namespace ComLibDemo.ViewModels
             SendEventInfo = TCPServer.GetEvent("OnServerSend");
             SendEventInfo.AddEventHandler(ServerService, SendEventHandler);
 
-            ServerService.StartService();
+            ServerService.StartService(1000);
 
             IsEnabledServerEndServiceButton = true;
         }
