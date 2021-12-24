@@ -209,6 +209,9 @@ namespace ComTCP
         /// <param name="asyncResult">受信結果</param>
         private void ReceiveCallback(IAsyncResult asyncResult)
         {
+            IsReceiveTimeoutLoop = false;
+            Thread.Sleep(100);
+
             // StateObject、クライアントソケットを取得
             var state = asyncResult.AsyncState as StateObject;
             var clientSocket = state.ClientSocket;

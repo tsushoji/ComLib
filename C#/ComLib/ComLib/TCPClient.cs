@@ -73,55 +73,68 @@ namespace ComTCP
         /// <param name="port">ポート</param>
         /// <param name="connectTimeoutMillSec">接続タイムアウトミリ秒</param>
         /// <param name="receiveTimeoutMillSec">受信タイムアウトミリ秒</param>
+        /// <param name="reTryNum">リトライ回数</param>
         /// <returns>接続可否</returns>
-        public bool Connect(string ip, int port, int connectTimeoutMillSec, int receiveTimeoutMillSec)
+        public bool Connect(string ip, int port, int connectTimeoutMillSec, int receiveTimeoutMillSec, int reTryNum)
         {
-            try
+            do
             {
-                // 受信タイムアウトセット
-                ReceiveTimeoutMillSec = receiveTimeoutMillSec;
-
-                // サーバーエンドポイント作成
-                var ipAddress = IPAddress.Parse(ip);
-                ServerIPEndPoint = new IPEndPoint(ipAddress, port);
-
-                // リモートホスト接続
-                Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                Socket.Connect(ServerIPEndPoint);
-
-                IsConnectTimeoutLoop = true;
-                var start = DateTime.Now;
-
-                // リモートホスト接続を開始
-                IAsyncResult asyncResult = Socket.BeginConnect(ServerIPEndPoint, new AsyncCallback(ConnectCallback), Socket);
-
-                // 接続タイムアウト
-                while (IsConnectTimeoutLoop)
+                try
                 {
-                    if (DateTime.Now - start > TimeSpan.FromMilliseconds(connectTimeoutMillSec))
+                    // 受信タイムアウトセット
+                    ReceiveTimeoutMillSec = receiveTimeoutMillSec;
+
+                    // サーバーエンドポイント作成
+                    var ipAddress = IPAddress.Parse(ip);
+                    ServerIPEndPoint = new IPEndPoint(ipAddress, port);
+
+                    // リモートホスト接続
+                    Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    Socket.Connect(ServerIPEndPoint);
+
+                    IsConnectTimeoutLoop = true;
+                    var start = DateTime.Now;
+
+                    // リモートホスト接続を開始
+                    IAsyncResult asyncResult = Socket.BeginConnect(ServerIPEndPoint, new AsyncCallback(ConnectCallback), Socket);
+
+                    // 接続タイムアウト
+                    while (IsConnectTimeoutLoop)
                     {
-                        // 接続終了
-                        Socket.EndConnect(asyncResult);
+                        if (DateTime.Now - start > TimeSpan.FromMilliseconds(connectTimeoutMillSec))
+                        {
+                            // 接続終了
+                            Socket.EndConnect(asyncResult);
 
-                        // 切断
-                        DisConnect();
+                            // 切断
+                            DisConnect();
 
-                        return false;
+                            return false;
+                        }
+                        Thread.Sleep(100);
                     }
-                    Thread.Sleep(100);
+
+                    // 接続成功
+                    if (!IsConnectTimeoutLoop)
+                    {
+                        return true;
+                    }
                 }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(ex.Message);
+
+                    // 切断
+                    DisConnect();
+
+                    return false;
+                }
+
+                reTryNum--;
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(ex.Message);
+            while (reTryNum > -1);
 
-                // 切断
-                DisConnect();
-
-                return false;
-            }
-
-            return true;
+            return false;
         }
 
         /// <summary>
@@ -131,6 +144,7 @@ namespace ComTCP
         private void ConnectCallback(IAsyncResult asyncResult)
         {
             IsConnectTimeoutLoop = false;
+            Thread.Sleep(100);
 
             // ソケットを取得
             var clientSocket = asyncResult.AsyncState as Socket;
@@ -169,6 +183,7 @@ namespace ComTCP
         private void ReceiveCallback(IAsyncResult asyncResult)
         {
             IsReceiveTimeoutLoop = false;
+            Thread.Sleep(100);
 
             // ソケットを取得
             var socket = asyncResult.AsyncState as Socket;
