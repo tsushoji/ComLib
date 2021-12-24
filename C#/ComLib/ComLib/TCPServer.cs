@@ -69,8 +69,8 @@ namespace ComTCP
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
         /// <param name="e">イベントデータ</param>
-        /// <param name="ex">例外オブジェクト</param>
-        public delegate void DisconnectedEventHandler(object sender, EventArgs e, Exception ex);
+        /// <param name="DisconnectedEndPoint">切断エンドポイント</param>
+        public delegate void DisconnectedEventHandler(object sender, EventArgs e, EndPoint DisconnectedEndPoint);
 
         /// <summary>
         /// 切断イベント
@@ -81,8 +81,9 @@ namespace ComTCP
         /// 接続イベントハンドラー
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
+        /// <param name="e">イベントデータ</param>
         /// <param name="connectedEndPoint">接続エンドポイント</param>
-        public delegate void ConnectedEventHandler(EventArgs e, EndPoint connectedEndPoint);
+        public delegate void ConnectedEventHandler(object sender, EventArgs e, EndPoint connectedEndPoint);
 
         /// <summary>
         /// 接続イベント
@@ -174,7 +175,7 @@ namespace ComTCP
             ClientSockets.Add(clientSocket);
 
             // 接続イベント発生
-            OnServerConnected?.Invoke(new EventArgs(), clientSocket.RemoteEndPoint);
+            OnServerConnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
 
             // StateObject作成
             var state = new StateObject();
@@ -269,26 +270,26 @@ namespace ComTCP
                 }
                 else
                 {
+                    // 切断イベント発生
+                    string msg = "0バイトデータの受信";
+                    OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
+
                     // 0バイトのデータを受信したときは切断
                     clientSocket.Close();
                     ClientSockets.Remove(clientSocket);
-
-                    // 切断イベント発生
-                    string msg = "0バイトデータの受信";
-                    OnServerDisconnected?.Invoke(this, new EventArgs(), new Exception(msg));
                 }
             }
             catch (SocketException e)
             {
                 if (e.NativeErrorCode.Equals(10054))
                 {
+                    // 切断イベント発生
+                    OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
+
                     // 既存の接続が、リモートホストによって強制的に切断された
                     // 保持しているクライアント情報をクリア
                     clientSocket.Close();
                     ClientSockets.Remove(clientSocket);
-
-                    // 切断イベント発生
-                    OnServerDisconnected?.Invoke(this, new EventArgs(), e);
                 }
             }
             catch (Exception ex)
@@ -335,7 +336,7 @@ namespace ComTCP
                 {
                     // 既存の接続が、リモート ホストによって強制的に切断されました
                     //接続断イベント発生
-                    OnServerDisconnected?.Invoke(this, new EventArgs(), e);
+                    OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
                 }
                 else
                 {
@@ -399,6 +400,8 @@ namespace ComTCP
 
             foreach (Socket clientSocket in ClientSockets)
             {
+                OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
+
                 clientSocket?.Close();
                 ClientSockets.Remove(clientSocket);
             }

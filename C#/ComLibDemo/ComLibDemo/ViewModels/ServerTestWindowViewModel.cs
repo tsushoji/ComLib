@@ -147,13 +147,13 @@ namespace ComLibDemo.ViewModels
             OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceiveData end"));
         }
 
-        private void OnDisconnected(object sender, EventArgs e, Exception ex)
+        private void OnDisconnected(object sender, EventArgs e, EndPoint disconnectedEndPoint)
         {
             OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnDisconnected start"));
             OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnDisconnected end"));
         }
 
-        private void OnConnected(EventArgs e, EndPoint connectedEndPoint)
+        private void OnConnected(object sender, EventArgs e, EndPoint connectedEndPoint)
         {
             OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnConnected end"));
             OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnConnected end"));

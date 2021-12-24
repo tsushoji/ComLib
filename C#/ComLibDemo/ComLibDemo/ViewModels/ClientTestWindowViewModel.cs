@@ -3,6 +3,7 @@ using Prism.Commands;
 using Prism.Mvvm;
 using System;
 using System.Collections.ObjectModel;
+using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using static ComTCP.TCPClient;
@@ -156,7 +157,7 @@ namespace ComLibDemo.ViewModels
             IsEnabledClientDisconnectButton = true;
         }
 
-        private void OnConnected(EventArgs e)
+        private void OnConnected(object sender, EventArgs e, EndPoint connectedEndPoint)
         {
             OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));
             OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));

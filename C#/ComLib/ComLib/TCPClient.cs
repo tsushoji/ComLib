@@ -47,7 +47,8 @@ namespace ComTCP
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
         /// <param name="receivedData">受信データ</param>
-        public delegate void ConnectEventHandler(EventArgs e);
+        /// <param name="connectedEndPoint">接続エンドポイント</param>
+        public delegate void ConnectEventHandler(object sender, EventArgs e, EndPoint connectedEndPoint);
 
         /// <summary>
         /// 接続イベント
@@ -151,7 +152,7 @@ namespace ComTCP
             clientSocket.EndConnect(asyncResult);
 
             // 接続イベント発生
-            OnClientConnected?.Invoke(new EventArgs());
+            OnClientConnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
 
             IsReceiveTimeoutLoop = true;
             var start = DateTime.Now;
