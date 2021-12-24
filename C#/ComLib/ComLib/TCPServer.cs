@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -271,7 +272,7 @@ namespace ComTCP
                 else
                 {
                     // 切断イベント発生
-                    string msg = "0バイトデータの受信";
+                    System.Diagnostics.Debug.WriteLine("サーバー:0バイトデータの受信");
                     OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
 
                     // 0バイトのデータを受信したときは切断
@@ -283,10 +284,11 @@ namespace ComTCP
             {
                 if (e.NativeErrorCode.Equals(10054))
                 {
+                    // 既存の接続が、リモートホストによって強制的に切断された
                     // 切断イベント発生
+                    System.Diagnostics.Debug.WriteLine("サーバー:既存の接続が、リモートホストによって強制的に切断された");
                     OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
 
-                    // 既存の接続が、リモートホストによって強制的に切断された
                     // 保持しているクライアント情報をクリア
                     clientSocket.Close();
                     ClientSockets.Remove(clientSocket);
@@ -294,6 +296,7 @@ namespace ComTCP
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
             }
         }
@@ -340,12 +343,13 @@ namespace ComTCP
                 }
                 else
                 {
-                    string msg = string.Format("Disconnected!: error code {0} : {1}", e.NativeErrorCode, e.Message);
+                    string msg = string.Format("サーバー: error code {0} : {1}", e.NativeErrorCode, e.Message);
                     System.Diagnostics.Debug.WriteLine(msg);
                 }
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
             }
         }
@@ -377,6 +381,7 @@ namespace ComTCP
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
             }
         }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Threading;
 
 namespace ComTCP
@@ -123,6 +124,7 @@ namespace ComTCP
                 }
                 catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                     System.Diagnostics.Debug.WriteLine(ex.Message);
 
                     // 切断
@@ -197,6 +199,7 @@ namespace ComTCP
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
                 return;
             }
@@ -249,6 +252,7 @@ namespace ComTCP
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
             }
         }
@@ -266,6 +270,7 @@ namespace ComTCP
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
 
                 return false;
