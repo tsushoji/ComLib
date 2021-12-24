@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 
 namespace ComTCP
 {
@@ -25,6 +26,21 @@ namespace ComTCP
         /// バッファー
         /// </summary>
         public byte[] Buffer { get; } = new byte[BufferSize];
+
+        /// <summary>
+        /// 接続タイムアウトループするか
+        /// </summary>
+        private bool IsConnectTimeoutLoop { get; set; }
+
+        /// <summary>
+        /// 受信タイムアウトループするか
+        /// </summary>
+        private bool IsReceiveTimeoutLoop { get; set; }
+
+        /// <summary>
+        /// 受信タイムアウトミリ秒
+        /// </summary>
+        private int ReceiveTimeoutMillSec { get; set; }
 
         /// <summary>
         /// 接続イベントハンドラー
@@ -55,11 +71,16 @@ namespace ComTCP
         /// </summary>
         /// <param name="ip">IP</param>
         /// <param name="port">ポート</param>
+        /// <param name="connectTimeoutMillSec">接続タイムアウトミリ秒</param>
+        /// <param name="receiveTimeoutMillSec">受信タイムアウトミリ秒</param>
         /// <returns>接続可否</returns>
-        public bool Connect(string ip, int port)
+        public bool Connect(string ip, int port, int connectTimeoutMillSec, int receiveTimeoutMillSec)
         {
             try
             {
+                // 受信タイムアウトセット
+                ReceiveTimeoutMillSec = receiveTimeoutMillSec;
+
                 // サーバーエンドポイント作成
                 var ipAddress = IPAddress.Parse(ip);
                 ServerIPEndPoint = new IPEndPoint(ipAddress, port);
@@ -68,8 +89,27 @@ namespace ComTCP
                 Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 Socket.Connect(ServerIPEndPoint);
 
+                IsConnectTimeoutLoop = true;
+                var start = DateTime.Now;
+
                 // リモートホスト接続を開始
-                Socket.BeginConnect(ServerIPEndPoint, new AsyncCallback(ConnectCallback), Socket);
+                IAsyncResult asyncResult = Socket.BeginConnect(ServerIPEndPoint, new AsyncCallback(ConnectCallback), Socket);
+
+                // 接続タイムアウト
+                while (IsConnectTimeoutLoop)
+                {
+                    if (DateTime.Now - start > TimeSpan.FromMilliseconds(connectTimeoutMillSec))
+                    {
+                        // 接続終了
+                        Socket.EndConnect(asyncResult);
+
+                        // 切断
+                        DisConnect();
+
+                        return false;
+                    }
+                    Thread.Sleep(100);
+                }
             }
             catch (Exception ex)
             {
@@ -90,6 +130,8 @@ namespace ComTCP
         /// <param name="asyncResult">接続結果</param>
         private void ConnectCallback(IAsyncResult asyncResult)
         {
+            IsConnectTimeoutLoop = false;
+
             // ソケットを取得
             var clientSocket = asyncResult.AsyncState as Socket;
             clientSocket.EndConnect(asyncResult);
@@ -97,8 +139,27 @@ namespace ComTCP
             // 接続イベント発生
             OnClientConnected?.Invoke(new EventArgs());
 
+            IsReceiveTimeoutLoop = true;
+            var start = DateTime.Now;
+
             // データ受信開始
             Socket.BeginReceive(Buffer, 0, BufferSize, 0, new AsyncCallback(ReceiveCallback), Socket);
+
+            // 受信タイムアウト
+            while (IsReceiveTimeoutLoop)
+            {
+                if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                {
+                    // 受信終了
+                    Socket.EndReceive(asyncResult);
+
+                    // 切断
+                    DisConnect();
+
+                    break;
+                }
+                Thread.Sleep(100);
+            }
         }
 
         /// <summary>
@@ -107,6 +168,8 @@ namespace ComTCP
         /// <param name="asyncResult">受信結果</param>
         private void ReceiveCallback(IAsyncResult asyncResult)
         {
+            IsReceiveTimeoutLoop = false;
+
             // ソケットを取得
             var socket = asyncResult.AsyncState as Socket;
 
@@ -131,8 +194,27 @@ namespace ComTCP
                 // データ受信イベント発生
                 OnClientReceiveData?.Invoke(this, receivedData);
 
+                IsReceiveTimeoutLoop = true;
+                var start = DateTime.Now;
+
                 // 再度受信を開始
                 socket.BeginReceive(this.Buffer, 0, this.Buffer.Length, 0, ReceiveCallback, socket);
+
+                // 受信タイムアウト
+                while (IsReceiveTimeoutLoop)
+                {
+                    if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                    {
+                        // 受信終了
+                        socket.EndReceive(asyncResult);
+
+                        // 切断
+                        DisConnect();
+
+                        break;
+                    }
+                    Thread.Sleep(100);
+                }
             }
         }
 

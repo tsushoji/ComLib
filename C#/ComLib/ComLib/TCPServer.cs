@@ -41,6 +41,16 @@ namespace ComTCP
         public SynchronizedCollection<Socket> ClientSockets { get; } = new SynchronizedCollection<Socket>();
 
         /// <summary>
+        /// 受信タイムアウトループするか
+        /// </summary>
+        private bool IsReceiveTimeoutLoop { get; set; }
+
+        /// <summary>
+        /// 受信タイムアウトミリ秒
+        /// </summary>
+        private int ReceiveTimeoutMillSec { get; set; }
+
+        /// <summary>
         /// データ受信イベントハンドラー
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
@@ -104,8 +114,11 @@ namespace ComTCP
         /// <summary>
         /// サーバー処理開始
         /// </summary>
-        public void StartService()
+        /// <param name="receiveTimeoutMillSec">受信タイムアウトミリ秒</param>
+        public void StartService(int receiveTimeoutMillSec)
         {
+            ReceiveTimeoutMillSec = receiveTimeoutMillSec;
+
             TaskListen = Task.Factory.StartNew(() =>
             {
                 Run();
@@ -167,8 +180,27 @@ namespace ComTCP
             var state = new StateObject();
             state.ClientSocket = clientSocket;
 
+            IsReceiveTimeoutLoop = true;
+            var start = DateTime.Now;
+
             // データ受信開始
             clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
+
+            // 受信タイムアウト
+            while (IsReceiveTimeoutLoop)
+            {
+                if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                {
+                    // 受信終了
+                    clientSocket.EndReceive(asyncResult);
+
+                    // サーバー処理終了
+                    EndService();
+
+                    break;
+                }
+                Thread.Sleep(100);
+            }
         }
 
         /// <summary>
@@ -210,8 +242,27 @@ namespace ComTCP
                         Send(clientSocket, sendData);
                     }
 
+                    IsReceiveTimeoutLoop = true;
+                    var start = DateTime.Now;
+
                     // データ受信開始
                     clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
+
+                    // 受信タイムアウト
+                    while (IsReceiveTimeoutLoop)
+                    {
+                        if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                        {
+                            // 受信終了
+                            clientSocket.EndReceive(asyncResult);
+
+                            // サーバー処理終了
+                            EndService();
+
+                            break;
+                        }
+                        Thread.Sleep(100);
+                    }
                 }
                 else
                 {

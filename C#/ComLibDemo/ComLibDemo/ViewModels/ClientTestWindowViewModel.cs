@@ -149,7 +149,7 @@ namespace ComLibDemo.ViewModels
 
             ConnectEventInfo.AddEventHandler(Client, ConnectEventHandler);
 
-            Client.Connect(IP, port);
+            Client.Connect(IP, port, 1000, 1000);
 
             ConnectEventInfo.RemoveEventHandler(Client, ConnectEventHandler);
 
