@@ -132,30 +132,40 @@ namespace ComTCP
         /// </summary>
         private void Run()
         {
-            using (Socket listenerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+            try
             {
-                // スレッド待機用
-                Mre = new ManualResetEvent(false);
-
-                // 切断後、再接続を可能にする
-                listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                // ソケットをアドレスにバインド
-                listenerSocket.Bind(IPEndPoint);
-
-                RunningListen = true;
-
-                // 接続待機開始
-                listenerSocket.Listen(Backlog);
-
-                // 接続待機のループ
-                while (RunningListen)
+                using (Socket listenerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
                 {
-                    Mre.Reset();
-                    // 非同期ソケットを開始して、接続をリッスンする
-                    listenerSocket.BeginAccept(new AsyncCallback(AcceptCallback), listenerSocket);
-                    // 接続があるまでスレッドを待機
-                    Mre.WaitOne();
+                    // スレッド待機用
+                    Mre = new ManualResetEvent(false);
+
+                    // 切断後、再接続を可能にする
+                    listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    // ソケットをアドレスにバインド
+                    listenerSocket.Bind(IPEndPoint);
+
+                    RunningListen = true;
+
+                    // 接続待機開始
+                    listenerSocket.Listen(Backlog);
+
+                    // 接続待機のループ
+                    while (RunningListen)
+                    {
+                        Mre.Reset();
+                        // 非同期ソケットを開始して、接続をリッスンする
+                        listenerSocket.BeginAccept(new AsyncCallback(AcceptCallback), listenerSocket);
+                        // 接続があるまでスレッドを待機
+                        Mre.WaitOne();
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+                // 処理終了
+                EndService();
             }
         }
 
@@ -165,44 +175,56 @@ namespace ComTCP
         /// <param name="asyncResult">接続受付結果</param>
         private void AcceptCallback(IAsyncResult asyncResult)
         {
-            // 待機スレッドが進行するようにシグナルをセット
-            Mre.Set();
-
-            // ソケットを取得
-            var listenerSocket = asyncResult.AsyncState as Socket;
-            var clientSocket = listenerSocket.EndAccept(asyncResult);
-
-            // 接続中のクライアントを追加
-            ClientSockets.Add(clientSocket);
-
-            // 接続イベント発生
-            OnServerConnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
-
-            // StateObject作成
-            var state = new StateObject();
-            state.ClientSocket = clientSocket;
-
-            IsReceiveTimeoutLoop = true;
-            var start = DateTime.Now;
-
-            // データ受信開始
-            clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
-
-            // 受信タイムアウト
-            while (IsReceiveTimeoutLoop)
+            try
             {
-                if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                // 待機スレッドが進行するようにシグナルをセット
+                Mre.Set();
+
+                // ソケットを取得
+                var listenerSocket = asyncResult.AsyncState as Socket;
+                var clientSocket = listenerSocket.EndAccept(asyncResult);
+
+                // 接続中のクライアントを追加
+                ClientSockets.Add(clientSocket);
+
+                // 接続イベント発生
+                OnServerConnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
+
+                // StateObject作成
+                var state = new StateObject();
+                state.ClientSocket = clientSocket;
+
+                IsReceiveTimeoutLoop = true;
+                var start = DateTime.Now;
+
+                // データ受信開始
+                clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
+
+                // 受信タイムアウト
+                while (IsReceiveTimeoutLoop)
                 {
-                    // 受信終了
-                    clientSocket.EndReceive(asyncResult);
+                    if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                    {
+                        // 受信終了
+                        clientSocket.EndReceive(asyncResult);
 
-                    // サーバー処理終了
-                    EndService();
+                        // サーバー処理終了
+                        EndService();
 
-                    break;
+                        break;
+                    }
+                    Thread.Sleep(100);
                 }
-                Thread.Sleep(100);
             }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+
+                // 処理終了
+                EndService();
+            }
+
         }
 
         /// <summary>
@@ -298,6 +320,9 @@ namespace ComTCP
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
+
+                // 処理終了
+                EndService();
             }
         }
 
@@ -351,6 +376,9 @@ namespace ComTCP
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
+
+                // 処理終了
+                EndService();
             }
         }
 
@@ -394,7 +422,7 @@ namespace ComTCP
             RunningListen = false;
 
             // 待機スレッドが進行するようにシグナルをセット
-            Mre.Set();
+            Mre?.Set();
 
             TaskListen?.Wait();
             TaskListen?.Dispose();
