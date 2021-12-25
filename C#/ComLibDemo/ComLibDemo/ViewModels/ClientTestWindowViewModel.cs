@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Windows;
 using static ComTCP.TCPClient;
 
 namespace ComLibDemo.ViewModels
@@ -204,8 +205,11 @@ namespace ComLibDemo.ViewModels
 
         private void OnConnected(object sender, EventArgs e, EndPoint connectedEndPoint)
         {
-            OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));
-            OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));
+            Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));
+            }));
         }
 
         private void OnDisconnect()
@@ -237,8 +241,11 @@ namespace ComLibDemo.ViewModels
 
         private void OnReceiveData(object sender, byte[] receivedData)
         {
-            OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceiveData start"));
-            OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceiveData end"));
+            Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceiveData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceiveData end"));
+            }));
         }
     }
 }
