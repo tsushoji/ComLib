@@ -54,12 +54,18 @@
             <TextBox Grid.Column="2" Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding InputSendIPTextBoxText}"/>
             <Label Grid.Column="1" Grid.Row="2" Content="ポート"/>
             <TextBox Grid.Column="2" Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding InputSendPortTextBoxText}"/>
+            <Label Grid.Column="1" Grid.Row="3" Grid.ColumnSpan="3" Content="接続タイムアウト(ミリ秒)"/>
+            <TextBox Grid.Column="1" Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding InputConnectTimeoutTextBoxText}"/>
+            <Label Grid.Column="1" Grid.Row="5" Grid.ColumnSpan="3" Content="受信タイムアウト(ミリ秒)"/>
+            <TextBox Grid.Column="1" Grid.Row="6" Grid.ColumnSpan="2" Text="{Binding InputReceiveTimeoutTextBoxText}"/>
+            <Label Grid.Column="1" Grid.Row="7" Grid.ColumnSpan="2" Content="リトライ回数"/>
+            <TextBox Grid.Column="1" Grid.Row="8" Grid.ColumnSpan="2" Text="{Binding InputReTryNumTextBoxText}"/>
             <Button Grid.Column="5" Grid.Row="1" Grid.ColumnSpan="3" Grid.RowSpan="3" Content="接続" Command="{Binding ClientConnectClicked}" IsEnabled="{Binding IsEnabledClientConnectButton}"/>
             <Button Grid.Column="9" Grid.Row="1" Grid.ColumnSpan="3" Grid.RowSpan="3" Content="切断" Command="{Binding ClientDisconnectClicked}" IsEnabled="{Binding IsEnabledClientDisconnectButton}"/>
 
-            <Label Grid.Column="1" Grid.Row="5" Grid.ColumnSpan="3" Content="送信文字列" FontSize="10"/>
-            <TextBox Grid.Column="1" Grid.Row="6" Grid.ColumnSpan="3" Grid.RowSpan="2" Text="{Binding InputSendStringTextBoxText}"/>
-            <Button Grid.Column="5" Grid.Row="5" Grid.ColumnSpan="3" Grid.RowSpan="3" Content="送信" Command="{Binding ClientSendDataClicked}" IsEnabled="{Binding IsEnabledClientSendDataButton}"/>
+            <Label Grid.Column="5" Grid.Row="5" Grid.ColumnSpan="3" Content="送信文字列" FontSize="10"/>
+            <TextBox Grid.Column="5" Grid.Row="6" Grid.ColumnSpan="3" Grid.RowSpan="2" Text="{Binding InputSendStringTextBoxText}"/>
+            <Button Grid.Column="9" Grid.Row="5" Grid.ColumnSpan="3" Grid.RowSpan="3" Content="送信" Command="{Binding ClientSendDataClicked}" IsEnabled="{Binding IsEnabledClientSendDataButton}"/>
         </Grid>
     </Grid>
 </Window>

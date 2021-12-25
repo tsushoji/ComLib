@@ -18,6 +18,12 @@ namespace ComLibDemo.ViewModels
 
         public string InputSendPortTextBoxText { get; set; } = string.Empty;
 
+        public string InputConnectTimeoutTextBoxText { get; set; } = string.Empty;
+
+        public string InputReceiveTimeoutTextBoxText { get; set; } = string.Empty;
+
+        public string InputReTryNumTextBoxText { get; set; } = string.Empty;
+
         public string InputSendStringTextBoxText { get; set; } = string.Empty;
 
         private Type TCPClient { get; set; }
@@ -132,32 +138,56 @@ namespace ComLibDemo.ViewModels
 
         private void OnConnect()
         {
+            bool isValidate = true;
+
             string IP = InputSendIPTextBoxText;
             if (!Regex.IsMatch(IP, @"[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}"))
             {
                 OutputMsgList.Add(new OutputTextModel(">>IPアドレスの形式で入力してください。"));
 
-                return;
+                isValidate = false;
             }
 
             int port;
-            if (!int.TryParse(InputSendPortTextBoxText, out port))
-            {
-                OutputMsgList.Add(new OutputTextModel(">>数値でポートを設定してください。"));
-
-                return;
-            }
-
-            if (port < 0)
+            if (!ParseHelper.TryParsePositeviNumStr(InputSendPortTextBoxText, out port))
             {
                 OutputMsgList.Add(new OutputTextModel(">>正の数でポートを設定してください。"));
 
+                isValidate = false;
+            }
+
+            int connectTimeout;
+            if (!ParseHelper.TryParsePositeviNumStr(InputConnectTimeoutTextBoxText, out connectTimeout))
+            {
+                OutputMsgList.Add(new OutputTextModel(">>正の数で接続タイムアウトを設定してください。"));
+
+                isValidate = false;
+            }
+
+            int receiveTimeout;
+            if (!ParseHelper.TryParsePositeviNumStr(InputReceiveTimeoutTextBoxText, out receiveTimeout))
+            {
+                OutputMsgList.Add(new OutputTextModel(">>正の数で受信タイムアウトを設定してください。"));
+
+                isValidate = false;
+            }
+
+            int reTryNum;
+            if (!ParseHelper.TryParsePositeviNumStr(InputReTryNumTextBoxText, out reTryNum))
+            {
+                OutputMsgList.Add(new OutputTextModel(">>正の数でリトライ回数を設定してください。"));
+
+                isValidate = false;
+            }
+
+            if (!isValidate)
+            {
                 return;
             }
 
             ConnectEventInfo.AddEventHandler(Client, ConnectEventHandler);
 
-            if (Client.Connect(IP, port, 1000, 1000, 1))
+            if (Client.Connect(IP, port, connectTimeout, receiveTimeout, reTryNum))
             {
                 OutputMsgList.Add(new OutputTextModel(">>接続成功"));
 

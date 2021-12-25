@@ -15,6 +15,8 @@ namespace ComLibDemo.ViewModels
 
         public string InputListenPortTextBoxText { get; set; } = string.Empty;
 
+        public string InputReceiveTimeoutTextBoxText { get; set; } = string.Empty;
+
         private Type TCPServer { get; set; }
 
         private dynamic ServerService { get; set; }
@@ -112,18 +114,26 @@ namespace ComLibDemo.ViewModels
 
         private void OnStartService()
         {
+            bool isValidate = true;
+
             int port;
-            if (!int.TryParse(InputListenPortTextBoxText, out port))
-            {
-                OutputMsgList.Add(new OutputTextModel(">>数値でポートを設定してください。"));
-
-                return;
-            }
-
-            if (port < 0)
+            if (!ParseHelper.TryParsePositeviNumStr(InputListenPortTextBoxText, out port))
             {
                 OutputMsgList.Add(new OutputTextModel(">>正の数でポートを設定してください。"));
 
+                isValidate = false;
+            }
+
+            int receiveTimeout;
+            if (!ParseHelper.TryParsePositeviNumStr(InputReceiveTimeoutTextBoxText, out receiveTimeout))
+            {
+                OutputMsgList.Add(new OutputTextModel(">>正の数で受信タイムアウトを設定してください。"));
+
+                isValidate = false;
+            }
+
+            if (!isValidate)
+            {
                 return;
             }
 
@@ -144,7 +154,7 @@ namespace ComLibDemo.ViewModels
             SendEventInfo = TCPServer.GetEvent("OnServerSend");
             SendEventInfo.AddEventHandler(ServerService, SendEventHandler);
 
-            ServerService.StartService(1000);
+            ServerService.StartService(receiveTimeout);
 
             OutputMsgList.Add(new OutputTextModel(">>サーバー処理開始"));
 
