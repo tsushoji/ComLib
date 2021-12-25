@@ -146,6 +146,8 @@ namespace ComLibDemo.ViewModels
 
             ServerService.StartService(1000);
 
+            OutputMsgList.Add(new OutputTextModel(">>サーバー処理開始"));
+
             IsEnabledServerEndServiceButton = true;
         }
 
@@ -176,6 +178,8 @@ namespace ComLibDemo.ViewModels
         private void OnEndService()
         {
             ServerService.EndService();
+
+            OutputMsgList.Add(new OutputTextModel(">>サーバー処理終了"));
 
             ReceiveDataEventInfo.RemoveEventHandler(ServerService, ReceiveEventHandler);
             ReceiveDataEventInfo = null;

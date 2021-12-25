@@ -157,12 +157,19 @@ namespace ComLibDemo.ViewModels
 
             ConnectEventInfo.AddEventHandler(Client, ConnectEventHandler);
 
-            Client.Connect(IP, port, 1000, 1000, 1);
+            if (Client.Connect(IP, port, 1000, 1000, 1))
+            {
+                OutputMsgList.Add(new OutputTextModel(">>接続成功"));
+
+                IsEnabledClientDisconnectButton = true;
+                IsEnabledClientSendDataButton = true;
+            }
+            else
+            {
+                OutputMsgList.Add(new OutputTextModel(">>接続失敗"));
+            }
 
             ConnectEventInfo.RemoveEventHandler(Client, ConnectEventHandler);
-
-            IsEnabledClientDisconnectButton = true;
-            IsEnabledClientSendDataButton = true;
         }
 
         private void OnConnected(object sender, EventArgs e, EndPoint connectedEndPoint)
@@ -175,6 +182,8 @@ namespace ComLibDemo.ViewModels
         {
             Client.DisConnect();
 
+            OutputMsgList.Add(new OutputTextModel(">>切断"));
+
             IsEnabledClientConnectButton = true;
         }
 
@@ -184,7 +193,14 @@ namespace ComLibDemo.ViewModels
 
             string sendText = InputSendStringTextBoxText;
             byte[] sendData = System.Text.Encoding.UTF8.GetBytes(sendText);
-            Client.Send(sendData);
+            if (Client.Send(sendData))
+            {
+                OutputMsgList.Add(new OutputTextModel(">>送信成功"));
+            }
+            else
+            {
+                OutputMsgList.Add(new OutputTextModel(">>送信失敗"));
+            }
 
             ReceiveDataEventInfo.RemoveEventHandler(Client, ReceiveEventHandler);
         }
