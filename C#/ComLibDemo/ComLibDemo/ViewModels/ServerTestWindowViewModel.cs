@@ -46,7 +46,11 @@ namespace ComLibDemo.ViewModels
             set
             {
                 SetProperty(ref _isEnabledServerStartServiceButton, value);
-                SetProperty(ref _isEnabledServerEndServiceButton, !value);
+
+                if (value)
+                {
+                    IsEnabledServerEndServiceButton = false;
+                }
             }
         }
 
@@ -61,7 +65,11 @@ namespace ComLibDemo.ViewModels
             set
             {
                 SetProperty(ref _isEnabledServerEndServiceButton, value);
-                SetProperty(ref _isEnabledServerStartServiceButton, !value);
+
+                if (value)
+                {
+                    IsEnabledServerStartServiceButton = false;
+                }
             }
         }
 

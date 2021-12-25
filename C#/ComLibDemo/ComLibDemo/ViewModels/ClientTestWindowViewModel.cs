@@ -43,8 +43,12 @@ namespace ComLibDemo.ViewModels
             set
             {
                 SetProperty(ref _isEnabledClientConnectButton, value);
-                SetProperty(ref _isEnabledClientDisconnectButton, !value);
-                SetProperty(ref _isEnabledClientSendDataButton, !value);
+
+                if (value)
+                {
+                    IsEnabledClientDisconnectButton = false;
+                    IsEnabledClientSendDataButton = false;
+                }
             }
         }
 
@@ -59,8 +63,11 @@ namespace ComLibDemo.ViewModels
             set
             {
                 SetProperty(ref _isEnabledClientDisconnectButton, value);
-                SetProperty(ref _isEnabledClientConnectButton, !value);
-                SetProperty(ref _isEnabledClientSendDataButton, !value);
+
+                if (value)
+                {
+                    IsEnabledClientConnectButton = false;
+                }
             }
         }
 
@@ -155,6 +162,7 @@ namespace ComLibDemo.ViewModels
             ConnectEventInfo.RemoveEventHandler(Client, ConnectEventHandler);
 
             IsEnabledClientDisconnectButton = true;
+            IsEnabledClientSendDataButton = true;
         }
 
         private void OnConnected(object sender, EventArgs e, EndPoint connectedEndPoint)
