@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using static ComTCP.TCPClient;
 
@@ -30,6 +31,10 @@ namespace ComLibDemo.ViewModels
         private Type TCPClient { get; set; }
 
         private dynamic Client { get; set; }
+
+        private Task SurvConnectedTask { get; set; }
+
+        private bool IsSurvConnectedRunning { get; set; } = false;
 
         private EventInfo ReceiveDataEventInfo { get; set; }
 
@@ -188,12 +193,20 @@ namespace ComLibDemo.ViewModels
 
             ConnectEventInfo.AddEventHandler(Client, ConnectEventHandler);
 
+            ReceiveDataEventInfo.AddEventHandler(Client, ReceiveEventHandler);
+
             if (Client.Connect(IP, port, connectTimeout, receiveTimeout, reTryNum))
             {
                 OutputMsgList.Add(new OutputTextModel(">>接続成功"));
 
                 IsEnabledClientDisconnectButton = true;
                 IsEnabledClientSendDataButton = true;
+
+                IsSurvConnectedRunning = true;
+                SurvConnectedTask = Task.Factory.StartNew(() =>
+                {
+                    SurvConnected();
+                });
             }
             else
             {
@@ -203,28 +216,53 @@ namespace ComLibDemo.ViewModels
             ConnectEventInfo.RemoveEventHandler(Client, ConnectEventHandler);
         }
 
-        private void OnConnected(object sender, EventArgs e, EndPoint connectedEndPoint)
+        private void OnConnected(object sender, EventArgs e, IPEndPoint connectedEndPoint)
         {
+            var addres = connectedEndPoint.Address.ToString();
+            var port = connectedEndPoint.Port.ToString();
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected start"));
+                OutputMsgList.Add(new OutputTextModel($">>アドレス:{addres}"));
+                OutputMsgList.Add(new OutputTextModel($">>ポート:{port}"));
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));
             }));
         }
 
+        private void SurvConnected()
+        {
+            while (IsSurvConnectedRunning)
+            {
+                if (!Client.GetConnectedStatus())
+                {
+                    ReceiveDataEventInfo.RemoveEventHandler(Client, ReceiveEventHandler);
+
+                    Application.Current.Dispatcher.Invoke(new Action(() =>
+                    {
+                        OutputMsgList.Add(new OutputTextModel(">>切断"));
+
+                        IsEnabledClientConnectButton = true;
+                    }));
+
+                    IsSurvConnectedRunning = false;
+                }
+            }
+        }
+
         private void OnDisconnect()
         {
+            IsSurvConnectedRunning = false;
+            SurvConnectedTask.Wait();
+
             Client.DisConnect();
 
-            OutputMsgList.Add(new OutputTextModel(">>切断"));
+            ReceiveDataEventInfo.RemoveEventHandler(Client, ReceiveEventHandler);
 
             IsEnabledClientConnectButton = true;
         }
 
         private void OnSendData()
         {
-            ReceiveDataEventInfo.AddEventHandler(Client, ReceiveEventHandler);
-
             string sendText = InputSendStringTextBoxText;
             byte[] sendData = System.Text.Encoding.UTF8.GetBytes(sendText);
             if (Client.Send(sendData))
@@ -235,15 +273,16 @@ namespace ComLibDemo.ViewModels
             {
                 OutputMsgList.Add(new OutputTextModel(">>送信失敗"));
             }
-
-            ReceiveDataEventInfo.RemoveEventHandler(Client, ReceiveEventHandler);
         }
 
         private void OnReceiveData(object sender, byte[] receivedData)
         {
+            var data = System.Text.Encoding.UTF8.GetString(receivedData);
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceiveData start"));
+                OutputMsgList.Add(new OutputTextModel(">>受信データ"));
+                OutputMsgList.Add(new OutputTextModel($">>{data}"));
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceiveData end"));
             }));
         }

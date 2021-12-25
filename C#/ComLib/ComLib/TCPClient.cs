@@ -9,11 +9,6 @@ namespace ComTCP
     public class TCPClient
     {
         /// <summary>
-        /// サーバーエンドポイント
-        /// </summary>
-        public IPEndPoint ServerIPEndPoint { get; private set; }
-
-        /// <summary>
         /// ソケット
         /// </summary>
         private Socket Socket { get; set; }
@@ -49,7 +44,7 @@ namespace ComTCP
         /// <param name="sender">イベント発生オブジェクト</param>
         /// <param name="receivedData">受信データ</param>
         /// <param name="connectedEndPoint">接続エンドポイント</param>
-        public delegate void ConnectEventHandler(object sender, EventArgs e, EndPoint connectedEndPoint);
+        public delegate void ConnectEventHandler(object sender, EventArgs e, IPEndPoint connectedEndPoint);
 
         /// <summary>
         /// 接続イベント
@@ -82,6 +77,7 @@ namespace ComTCP
             // 受信タイムアウトセット
             ReceiveTimeoutMillSec = receiveTimeoutMillSec;
 
+            EndPoint ServerIPEndPoint;
             try
             {
                 // サーバーエンドポイント作成
@@ -168,7 +164,7 @@ namespace ComTCP
                 clientSocket.EndConnect(asyncResult);
 
                 // 接続イベント発生
-                OnClientConnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
+                OnClientConnected?.Invoke(this, new EventArgs(), (IPEndPoint)clientSocket.RemoteEndPoint);
 
                 IsReceiveTimeoutLoop = true;
                 var start = DateTime.Now;
@@ -308,6 +304,20 @@ namespace ComTCP
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// 接続状態を取得
+        /// </summary>
+        /// <returns>接続されているとき、true それ以外のとき、false</returns>
+        public bool GetConnectedStatus()
+        {
+            if (Socket != null)
+            {
+                return Socket.Connected;
+            }
+
+            return false;
         }
     }
 }
