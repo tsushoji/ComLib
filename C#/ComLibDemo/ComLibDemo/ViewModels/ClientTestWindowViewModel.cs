@@ -18,15 +18,243 @@ namespace ComLibDemo.ViewModels
 
         public string InputSendIPTextBoxText { get; set; } = string.Empty;
 
+        private bool _isEnabledInputSendIPTextBoxText = true;
+        public bool IsEnabledInputSendIPTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputSendIPTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputSendIPTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputSendIPTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputSendIPTextBoxText = false;
+        public bool IsReadOnlyInputSendIPTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputSendIPTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputSendIPTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputSendIPTextBoxText = false;
+                }
+            }
+        }
+
         public string InputSendPortTextBoxText { get; set; } = string.Empty;
+
+        private bool _isEnabledInputSendPortTextBoxText = true;
+        public bool IsEnabledInputSendPortTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputSendPortTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputSendPortTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputSendPortTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputSendPortTextBoxText = false;
+        public bool IsReadOnlyInputSendPortTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputSendPortTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputSendPortTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputSendPortTextBoxText = false;
+                }
+            }
+        }
 
         public string InputConnectTimeoutTextBoxText { get; set; } = string.Empty;
 
+        private bool _isEnabledInputConnectTimeoutTextBoxText = true;
+        public bool IsEnabledInputConnectTimeoutTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputConnectTimeoutTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputConnectTimeoutTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputConnectTimeoutTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputConnectTimeoutTextBoxText = false;
+        public bool IsReadOnlyInputConnectTimeoutTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputConnectTimeoutTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputConnectTimeoutTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputConnectTimeoutTextBoxText = false;
+                }
+            }
+        }
+
         public string InputReceiveTimeoutTextBoxText { get; set; } = string.Empty;
+
+        private bool _isEnabledInputReceiveTimeoutTextBoxText = true;
+        public bool IsEnabledInputReceiveTimeoutTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputReceiveTimeoutTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputReceiveTimeoutTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputReceiveTimeoutTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputReceiveTimeoutTextBoxText = false;
+        public bool IsReadOnlyInputReceiveTimeoutTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputReceiveTimeoutTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputReceiveTimeoutTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputReceiveTimeoutTextBoxText = false;
+                }
+            }
+        }
 
         public string InputReTryNumTextBoxText { get; set; } = string.Empty;
 
+        private bool _isEnabledInputReTryNumTextBoxText = true;
+        public bool IsEnabledInputReTryNumTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputReTryNumTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputReTryNumTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputReTryNumTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputReTryNumTextBoxText = false;
+        public bool IsReadOnlyInputReTryNumTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputReTryNumTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputReTryNumTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputReTryNumTextBoxText = false;
+                }
+            }
+        }
+
         public string InputSendStringTextBoxText { get; set; } = string.Empty;
+
+        private bool _isEnabledInputSendStringTextBoxText = false;
+        public bool IsEnabledInputSendStringTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputSendStringTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputSendStringTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputSendStringTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputSendStringTextBoxText = true;
+        public bool IsReadOnlyInputSendStringTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputSendStringTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputSendStringTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputSendStringTextBoxText = false;
+                }
+            }
+        }
 
         private Type TCPClient { get; set; }
 
@@ -199,6 +427,14 @@ namespace ComLibDemo.ViewModels
             {
                 OutputMsgList.Add(new OutputTextModel(">>接続成功"));
 
+                IsReadOnlyInputSendIPTextBoxText = true;
+                IsReadOnlyInputSendPortTextBoxText = true;
+                IsReadOnlyInputConnectTimeoutTextBoxText = true;
+                IsReadOnlyInputReceiveTimeoutTextBoxText = true;
+                IsReadOnlyInputReTryNumTextBoxText = true;
+
+                IsEnabledInputSendStringTextBoxText = true;
+
                 IsEnabledClientDisconnectButton = true;
                 IsEnabledClientSendDataButton = true;
 
@@ -241,6 +477,14 @@ namespace ComLibDemo.ViewModels
                     {
                         OutputMsgList.Add(new OutputTextModel(">>切断"));
 
+                        IsEnabledInputSendIPTextBoxText = true;
+                        IsEnabledInputSendPortTextBoxText = true;
+                        IsEnabledInputConnectTimeoutTextBoxText = true;
+                        IsEnabledInputReceiveTimeoutTextBoxText = true;
+                        IsEnabledInputReTryNumTextBoxText = true;
+
+                        IsReadOnlyInputSendStringTextBoxText = true;
+
                         IsEnabledClientConnectButton = true;
                     }));
 
@@ -257,6 +501,14 @@ namespace ComLibDemo.ViewModels
             Client.DisConnect();
 
             ReceiveDataEventInfo.RemoveEventHandler(Client, ReceiveEventHandler);
+
+            IsEnabledInputSendIPTextBoxText = true;
+            IsEnabledInputSendPortTextBoxText = true;
+            IsEnabledInputConnectTimeoutTextBoxText = true;
+            IsEnabledInputReceiveTimeoutTextBoxText = true;
+            IsEnabledInputReTryNumTextBoxText = true;
+
+            IsReadOnlyInputSendStringTextBoxText = true;
 
             IsEnabledClientConnectButton = true;
         }
