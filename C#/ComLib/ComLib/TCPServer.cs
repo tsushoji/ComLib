@@ -13,7 +13,7 @@ namespace ComTCP
         /// <summary>
         /// スレッド待機用
         /// </summary>
-        private ManualResetEvent Mre;
+        private readonly ManualResetEvent ConnectMre = new ManualResetEvent(false);
 
         /// <summary>
         /// リッスンタスク
@@ -38,13 +38,9 @@ namespace ComTCP
         /// <summary>
         /// 接続中のクライアント
         /// スレッドセーフコレクション
+        /// 「foreach」はサポートなし
         /// </summary>
         public SynchronizedCollection<Socket> ClientSockets { get; } = new SynchronizedCollection<Socket>();
-
-        /// <summary>
-        /// 受信タイムアウトループするか
-        /// </summary>
-        private bool IsReceiveTimeoutLoop { get; set; }
 
         /// <summary>
         /// 受信タイムアウトミリ秒
@@ -114,6 +110,14 @@ namespace ComTCP
         }
 
         /// <summary>
+        /// デストラクタ
+        /// </summary>
+        ~TCPServer()
+        {
+            ConnectMre.Dispose();
+        }
+
+        /// <summary>
         /// サーバー処理開始
         /// </summary>
         /// <param name="receiveTimeoutMillSec">受信タイムアウトミリ秒</param>
@@ -136,27 +140,24 @@ namespace ComTCP
             {
                 using (Socket listenerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
                 {
-                    // スレッド待機用
-                    Mre = new ManualResetEvent(false);
-
                     // 切断後、再接続を可能にする
                     listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                     // ソケットをアドレスにバインド
                     listenerSocket.Bind(IPEndPoint);
 
-                    RunningListen = true;
-
                     // 接続待機開始
                     listenerSocket.Listen(Backlog);
 
-                    // 接続待機のループ
+                    // 接続待機のループ開始
+                    RunningListen = true;
+
                     while (RunningListen)
                     {
-                        Mre.Reset();
+                        ConnectMre.Reset();
                         // 非同期ソケットを開始して、接続をリッスンする
                         listenerSocket.BeginAccept(new AsyncCallback(AcceptCallback), listenerSocket);
                         // 接続があるまでスレッドを待機
-                        Mre.WaitOne();
+                        ConnectMre.WaitOne();
                     }
                 }
             }
@@ -175,14 +176,23 @@ namespace ComTCP
         /// <param name="asyncResult">接続受付結果</param>
         private void AcceptCallback(IAsyncResult asyncResult)
         {
+            // サービス終了時は処理しない
+            if (!RunningListen)
+            {
+                return;
+            }
+
+            Socket clientSocket = null;
+            StateObject state = null;
+
             try
             {
                 // 待機スレッドが進行するようにシグナルをセット
-                Mre.Set();
+                ConnectMre.Set();
 
                 // ソケットを取得
                 var listenerSocket = asyncResult.AsyncState as Socket;
-                var clientSocket = listenerSocket.EndAccept(asyncResult);
+                clientSocket = listenerSocket.EndAccept(asyncResult);
 
                 // 接続中のクライアントを追加
                 ClientSockets.Add(clientSocket);
@@ -190,30 +200,35 @@ namespace ComTCP
                 // 接続イベント発生
                 OnServerConnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
 
-                // StateObject作成
-                var state = new StateObject();
-                state.ClientSocket = clientSocket;
+                state = new StateObject
+                {
+                    ClientSocket = clientSocket,
+                    IsReceiveTimeoutLoop = true,
+                    IsReceived = false
+                };
 
-                IsReceiveTimeoutLoop = true;
                 var start = DateTime.Now;
 
-                // データ受信開始
+                // 非同期ソケットを開始して、受信する
                 clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
 
-                // 受信タイムアウト
-                while (IsReceiveTimeoutLoop)
+                while (state.IsReceiveTimeoutLoop)
                 {
+                    // 受信タイムアウト
                     if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                     {
-                        // 受信終了
-                        clientSocket.EndReceive(asyncResult);
-
-                        // サーバー処理終了
-                        EndService();
+                        RemoveClientSocket(clientSocket);
 
                         break;
                     }
-                    Thread.Sleep(100);
+
+                    // 受信成功
+                    if (state.IsReceived)
+                    {
+                        state.IsReceived = false;
+
+                        break;
+                    }
                 }
             }
             catch (Exception ex)
@@ -221,10 +236,12 @@ namespace ComTCP
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
 
-                // 処理終了
-                EndService();
+                RemoveClientSocket(clientSocket);
             }
-
+            finally
+            {
+                state.IsReceiveTimeoutLoop = false;
+            }
         }
 
         /// <summary>
@@ -233,10 +250,13 @@ namespace ComTCP
         /// <param name="asyncResult">受信結果</param>
         private void ReceiveCallback(IAsyncResult asyncResult)
         {
-            IsReceiveTimeoutLoop = false;
-            Thread.Sleep(100);
+            // サービス終了時は処理しない
+            if (!RunningListen)
+            {
+                return;
+            }
 
-            // StateObject、クライアントソケットを取得
+            // データ受信格納情報、クライアントソケットを取得
             var state = asyncResult.AsyncState as StateObject;
             var clientSocket = state.ClientSocket;
 
@@ -247,16 +267,19 @@ namespace ComTCP
 
                 if (bytes > 0)
                 {
-                    // 受信したバイナリーデータを取得
-                    var receivedData = new byte[bytes];
-                    Array.Copy(state.Buffer, receivedData, bytes);
+                    // 受信
+                    state.IsReceived = true;
+                    // 呼び出し元スレッドが完了するまで待機
+                    while (state.IsReceiveTimeoutLoop)
+                    {
+                        Thread.Sleep(100);
+                    }
 
                     var sendData = new byte[StateObject.BufferSize];
-
                     bool isSendAll = false;
 
                     // データ受信イベント発生
-                    OnServerReceiveData?.Invoke(this, receivedData, ref sendData, ref isSendAll);
+                    OnServerReceiveData?.Invoke(this, state.Buffer, ref sendData, ref isSendAll);
 
                     if (isSendAll)
                     {
@@ -269,51 +292,31 @@ namespace ComTCP
                         Send(clientSocket, sendData);
                     }
 
-                    IsReceiveTimeoutLoop = true;
                     var start = DateTime.Now;
 
-                    // データ受信開始
+                    // 非同期ソケットを開始して、受信する
                     clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
 
-                    // 受信タイムアウト
-                    while (IsReceiveTimeoutLoop)
+                    state.IsReceiveTimeoutLoop = true;
+
+                    while (state.IsReceiveTimeoutLoop)
                     {
+                        // 受信タイムアウト
                         if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                         {
-                            // 受信終了
-                            clientSocket.EndReceive(asyncResult);
-
-                            // サーバー処理終了
-                            EndService();
+                            RemoveClientSocket(clientSocket);
 
                             break;
                         }
-                        Thread.Sleep(100);
+
+                        // 受信成功
+                        if (state.IsReceived)
+                        {
+                            state.IsReceived = false;
+
+                            break;
+                        }
                     }
-                }
-                else
-                {
-                    // 切断イベント発生
-                    System.Diagnostics.Debug.WriteLine("サーバー:0バイトデータの受信");
-                    OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
-
-                    // 0バイトのデータを受信したときは切断
-                    clientSocket.Close();
-                    ClientSockets.Remove(clientSocket);
-                }
-            }
-            catch (SocketException e)
-            {
-                if (e.NativeErrorCode.Equals(10054))
-                {
-                    // 既存の接続が、リモートホストによって強制的に切断された
-                    // 切断イベント発生
-                    System.Diagnostics.Debug.WriteLine("サーバー:既存の接続が、リモートホストによって強制的に切断された");
-                    OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
-
-                    // 保持しているクライアント情報をクリア
-                    clientSocket.Close();
-                    ClientSockets.Remove(clientSocket);
                 }
             }
             catch (Exception ex)
@@ -321,20 +324,34 @@ namespace ComTCP
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
 
-                // 処理終了
-                EndService();
+                RemoveClientSocket(clientSocket);
+            }
+            finally
+            {
+                // 受信タイムアウト終了
+                state.IsReceiveTimeoutLoop = false;
             }
         }
 
         /// <summary>
         /// 接続されたクライアント情報を格納するクラス
         /// </summary>
-        public class StateObject
+        private class StateObject
         {
             /// <summary>
             /// クライアントソケット
             /// </summary>
             public Socket ClientSocket { get; set; }
+
+            /// <summary>
+            /// 受信タイムアウトループするか
+            /// </summary>
+            public bool IsReceiveTimeoutLoop { get; set; }
+
+            /// <summary>
+            /// 受信したか
+            /// </summary>
+            public bool IsReceived { get; set; }
 
             /// <summary>
             /// バッファーサイズ
@@ -356,29 +373,15 @@ namespace ComTCP
         {
             try
             {
+                // 非同期ソケットを開始して、送信する
                 clientSocket.BeginSend(data, 0, data.Length, 0, new AsyncCallback(SendCallback), clientSocket);
-            }
-            catch (SocketException e)
-            {
-                if (e.NativeErrorCode.Equals(10054))
-                {
-                    // 既存の接続が、リモート ホストによって強制的に切断されました
-                    //接続断イベント発生
-                    OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
-                }
-                else
-                {
-                    string msg = string.Format("サーバー: error code {0} : {1}", e.NativeErrorCode, e.Message);
-                    System.Diagnostics.Debug.WriteLine(msg);
-                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
 
-                // 処理終了
-                EndService();
+                RemoveClientSocket(clientSocket);
             }
         }
 
@@ -388,9 +391,11 @@ namespace ComTCP
         /// <param name="data">データ</param>
         private void SendAllClient(byte[] data)
         {
-            foreach (var clientSocket in ClientSockets)
+            int index = ClientSockets.Count - 1;
+            while (index > -1)
             {
-                Send(clientSocket, data);
+                Send(ClientSockets[index], data);
+                index--;
             }
         }
 
@@ -400,10 +405,18 @@ namespace ComTCP
         /// <param name="asyncResult">送信結果</param>
         private void SendCallback(IAsyncResult asyncResult)
         {
+            // サービス終了時は処理しない
+            if (!RunningListen)
+            {
+                return;
+            }
+
+            Socket clientSocket = null;
+
             try
             {
                 // クライアントソケットへのデータ送信処理を完了する
-                var clientSocket = asyncResult.AsyncState as Socket;
+                clientSocket = asyncResult.AsyncState as Socket;
                 var byteSize = clientSocket.EndSend(asyncResult);
                 OnServerSend?.Invoke(byteSize, clientSocket.RemoteEndPoint);
             }
@@ -411,6 +424,8 @@ namespace ComTCP
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
+
+                RemoveClientSocket(clientSocket);
             }
         }
 
@@ -422,22 +437,42 @@ namespace ComTCP
             RunningListen = false;
 
             // 待機スレッドが進行するようにシグナルをセット
-            Mre?.Set();
+            ConnectMre.Set();
 
+            // リッスンタスク終了
             TaskListen?.Wait();
             TaskListen?.Dispose();
             TaskListen = null;
 
-            Mre?.Dispose();
-            Mre = null;
+            // 保持しているすべての接続済みクライアント情報を削除
+            int index = ClientSockets.Count - 1;
+            while (index > -1)
+            {
+                OnServerDisconnected?.Invoke(this, new EventArgs(), ClientSockets[index].RemoteEndPoint);
 
-            foreach (Socket clientSocket in ClientSockets)
+                ClientSockets.RemoveAt(index);
+                index--;
+            }
+        }
+
+        /// <summary>
+        /// 保持している指定クライアント情報を削除
+        /// </summary>
+        /// <param name="clientSocket">クライアントソケット</param>
+        /// <returns>削除したとき、true それ以外のとき、false</returns>
+        private bool RemoveClientSocket(Socket clientSocket)
+        {
+            if (ClientSockets.Contains(clientSocket))
             {
                 OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
 
-                clientSocket?.Close();
+                clientSocket.Close();
                 ClientSockets.Remove(clientSocket);
+
+                return true;
             }
+
+            return false;
         }
     }
 }
