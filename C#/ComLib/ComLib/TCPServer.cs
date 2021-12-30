@@ -13,7 +13,7 @@ namespace ComTCP
         /// <summary>
         /// スレッド待機用
         /// </summary>
-        private readonly ManualResetEvent ConnectMre = new ManualResetEvent(false);
+        private readonly ManualResetEvent connectMre = new ManualResetEvent(false);
 
         /// <summary>
         /// リッスンタスク
@@ -23,7 +23,7 @@ namespace ComTCP
         /// <summary>
         /// サーバーのエンドポイント
         /// </summary>
-        public IPEndPoint IPEndPoint { get; private set; }
+        private IPEndPoint IPEndPoint { get; set; }
 
         /// <summary>
         /// 接続待機ループ実行中
@@ -33,14 +33,14 @@ namespace ComTCP
         /// <summary>
         /// サーバにacceptされていないクライアントからの接続要求を保持しておくキューの最大長
         /// </summary>
-        private int Backlog { get; set; } = 10;
+        private int Backlog { get; set; }
 
         /// <summary>
         /// 接続中のクライアント
         /// スレッドセーフコレクション
         /// 「foreach」はサポートなし
         /// </summary>
-        public SynchronizedCollection<Socket> ClientSockets { get; } = new SynchronizedCollection<Socket>();
+        private SynchronizedCollection<Socket> ClientSockets { get; set; } = new SynchronizedCollection<Socket>();
 
         /// <summary>
         /// 受信タイムアウトミリ秒
@@ -114,15 +114,18 @@ namespace ComTCP
         /// </summary>
         ~TCPServer()
         {
-            ConnectMre.Dispose();
+            connectMre.Dispose();
+            ClientSockets = null;
         }
 
         /// <summary>
         /// サーバー処理開始
         /// </summary>
+        /// <param name="listenBackLog">acceptされていないクライアントからの接続要求を保持しておくキューの最大長</param>
         /// <param name="receiveTimeoutMillSec">受信タイムアウトミリ秒</param>
-        public void StartService(int receiveTimeoutMillSec)
+        public void StartService(int listenBackLog, int receiveTimeoutMillSec)
         {
+            Backlog = listenBackLog;
             ReceiveTimeoutMillSec = receiveTimeoutMillSec;
 
             TaskListen = Task.Factory.StartNew(() =>
@@ -153,11 +156,11 @@ namespace ComTCP
 
                     while (RunningListen)
                     {
-                        ConnectMre.Reset();
+                        connectMre.Reset();
                         // 非同期ソケットを開始して、接続をリッスンする
                         listenerSocket.BeginAccept(new AsyncCallback(AcceptCallback), listenerSocket);
                         // 接続があるまでスレッドを待機
-                        ConnectMre.WaitOne();
+                        connectMre.WaitOne();
                     }
                 }
             }
@@ -165,7 +168,7 @@ namespace ComTCP
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
-                // 処理終了
+
                 EndService();
             }
         }
@@ -188,7 +191,7 @@ namespace ComTCP
             try
             {
                 // 待機スレッドが進行するようにシグナルをセット
-                ConnectMre.Set();
+                connectMre.Set();
 
                 // ソケットを取得
                 var listenerSocket = asyncResult.AsyncState as Socket;
@@ -212,19 +215,20 @@ namespace ComTCP
 
                 var start = DateTime.Now;
 
+                // 受信タイムアウト処理
                 while (state.IsReceiveTimeoutLoop)
                 {
-                    // 受信タイムアウト
                     if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                     {
+                        // 受信タイムアウト
                         RemoveClientSocket(clientSocket);
 
                         break;
                     }
 
-                    // 受信成功
                     if (state.IsReceived)
                     {
+                        // 受信成功
                         state.IsReceived = false;
 
                         break;
@@ -263,11 +267,11 @@ namespace ComTCP
             try
             {
                 // クライアントソケットから受信データを取得終了
-                int bytes = clientSocket.EndReceive(asyncResult);
+                var bytes = clientSocket.EndReceive(asyncResult);
 
                 if (bytes > 0)
                 {
-                    // 受信
+                    // 受信成功
                     state.IsReceived = true;
                     // 呼び出し元スレッドが完了するまで待機
                     while (state.IsReceiveTimeoutLoop)
@@ -278,7 +282,7 @@ namespace ComTCP
                     var sendData = new byte[StateObject.BufferSize];
                     bool isSendAll = false;
 
-                    // データ受信イベント発生
+                    // 受信イベント発生
                     OnServerReceiveData?.Invoke(this, state.Buffer, ref sendData, ref isSendAll);
 
                     if (isSendAll)
@@ -299,19 +303,20 @@ namespace ComTCP
 
                     state.IsReceiveTimeoutLoop = true;
 
+                    // 受信タイムアウト処理
                     while (state.IsReceiveTimeoutLoop)
                     {
-                        // 受信タイムアウト
                         if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                         {
+                            // 受信タイムアウト
                             RemoveClientSocket(clientSocket);
 
                             break;
                         }
 
-                        // 受信成功
                         if (state.IsReceived)
                         {
+                            // 受信成功
                             state.IsReceived = false;
 
                             break;
@@ -328,7 +333,6 @@ namespace ComTCP
             }
             finally
             {
-                // 受信タイムアウト終了
                 state.IsReceiveTimeoutLoop = false;
             }
         }
@@ -418,6 +422,7 @@ namespace ComTCP
                 // クライアントソケットへのデータ送信処理を完了する
                 clientSocket = asyncResult.AsyncState as Socket;
                 var byteSize = clientSocket.EndSend(asyncResult);
+                // 送信イベント発生
                 OnServerSend?.Invoke(byteSize, clientSocket.RemoteEndPoint);
             }
             catch (Exception ex)
@@ -437,7 +442,7 @@ namespace ComTCP
             RunningListen = false;
 
             // 待機スレッドが進行するようにシグナルをセット
-            ConnectMre.Set();
+            connectMre.Set();
 
             // リッスンタスク終了
             TaskListen?.Wait();
@@ -473,6 +478,15 @@ namespace ComTCP
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// 接続待機中か
+        /// </summary>
+        /// <returns>接続待機中のとき、true それ以外のとき、false</returns>
+        public bool IsServiceRunning()
+        {
+            return RunningListen;
         }
     }
 }

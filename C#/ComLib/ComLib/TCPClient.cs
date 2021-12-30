@@ -298,7 +298,7 @@ namespace ComTCP
                     // 受信成功
                     IsReceiveDone = true;
 
-                    // データ受信イベント発生
+                    // 受信イベント発生
                     OnClientReceiveData?.Invoke(this, Buffer);
 
                     // 呼び出し元スレッドが完了するまで待機

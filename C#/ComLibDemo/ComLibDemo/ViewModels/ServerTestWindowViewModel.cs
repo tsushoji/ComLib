@@ -5,6 +5,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Net;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows;
 using static ComTCP.TCPServer;
 
@@ -16,11 +17,131 @@ namespace ComLibDemo.ViewModels
 
         public string InputListenPortTextBoxText { get; set; } = string.Empty;
 
+        private bool _isEnabledInputListenPortTextBoxText = true;
+        public bool IsEnabledInputListenPortTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputListenPortTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputListenPortTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputListenPortTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputListenPortTextBoxText = false;
+        public bool IsReadOnlyInputListenPortTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputListenPortTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputListenPortTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputListenPortTextBoxText = false;
+                }
+            }
+        }
+
+        public string InputListenBackLogTextBoxText { get; set; } = string.Empty;
+
+        private bool _isEnabledInputListenBackLogTextBoxText = true;
+        public bool IsEnabledInputListenBackLogTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputListenBackLogTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputListenBackLogTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputListenBackLogTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputListenBackLogTextBoxText = false;
+        public bool IsReadOnlyInputListenBackLogTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputListenBackLogTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputListenBackLogTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputListenBackLogTextBoxText = false;
+                }
+            }
+        }
+
         public string InputReceiveTimeoutTextBoxText { get; set; } = string.Empty;
+
+        private bool _isEnabledInputReceiveTimeoutTextBoxText = true;
+        public bool IsEnabledInputReceiveTimeoutTextBoxText
+        {
+            get
+            {
+                return _isEnabledInputReceiveTimeoutTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isEnabledInputReceiveTimeoutTextBoxText, value);
+
+                if (value)
+                {
+                    IsReadOnlyInputReceiveTimeoutTextBoxText = false;
+                }
+            }
+        }
+
+        private bool _isReadOnlyInputReceiveTimeoutTextBoxText = false;
+        public bool IsReadOnlyInputReceiveTimeoutTextBoxText
+        {
+            get
+            {
+                return _isReadOnlyInputReceiveTimeoutTextBoxText;
+            }
+
+            set
+            {
+                SetProperty(ref _isReadOnlyInputReceiveTimeoutTextBoxText, value);
+
+                if (value)
+                {
+                    IsEnabledInputReceiveTimeoutTextBoxText = false;
+                }
+            }
+        }
 
         private Type TCPServer { get; set; }
 
         private dynamic ServerService { get; set; }
+
+        private Task SurvStartUpServiceTask { get; set; }
+
+        private bool IsSurvStartUpServiceRunning { get; set; } = false;
 
         private EventInfo ReceiveDataEventInfo { get; set; }
 
@@ -125,6 +246,14 @@ namespace ComLibDemo.ViewModels
                 isValidate = false;
             }
 
+            int listenBackLog;
+            if (!ParseHelper.TryParsePositeviNumStr(InputListenBackLogTextBoxText, out listenBackLog))
+            {
+                OutputMsgList.Add(new OutputTextModel(">>正の数でリッスンバックログ最大長を設定してください。"));
+
+                isValidate = false;
+            }
+
             int receiveTimeout;
             if (!ParseHelper.TryParsePositeviNumStr(InputReceiveTimeoutTextBoxText, out receiveTimeout))
             {
@@ -155,11 +284,55 @@ namespace ComLibDemo.ViewModels
             SendEventInfo = TCPServer.GetEvent("OnServerSend");
             SendEventInfo.AddEventHandler(ServerService, SendEventHandler);
 
-            ServerService.StartService(receiveTimeout);
+            ServerService.StartService(listenBackLog, receiveTimeout);
 
             OutputMsgList.Add(new OutputTextModel(">>サーバー処理開始"));
 
+            IsReadOnlyInputListenPortTextBoxText = true;
+            IsReadOnlyInputListenBackLogTextBoxText = true;
+            IsReadOnlyInputReceiveTimeoutTextBoxText = true;
+
             IsEnabledServerEndServiceButton = true;
+
+            IsSurvStartUpServiceRunning = true;
+            SurvStartUpServiceTask = Task.Factory.StartNew(() =>
+            {
+                SurvConnected();
+            });
+        }
+
+        private void SurvConnected()
+        {
+            while (IsSurvStartUpServiceRunning)
+            {
+                if (!ServerService.IsServiceRunning())
+                {
+                    ReceiveDataEventInfo.RemoveEventHandler(ServerService, ReceiveEventHandler);
+                    ReceiveDataEventInfo = null;
+
+                    DisconnectedEventInfo.RemoveEventHandler(ServerService, DisconnectedEventHandler);
+                    DisconnectedEventInfo = null;
+
+                    ConnectedEventInfo.RemoveEventHandler(ServerService, ConnectedEventHandler);
+                    ConnectedEventInfo = null;
+
+                    SendEventInfo.RemoveEventHandler(ServerService, SendEventHandler);
+                    SendEventInfo = null;
+
+                    Application.Current.Dispatcher.Invoke(new Action(() =>
+                    {
+                        OutputMsgList.Add(new OutputTextModel(">>サーバー処理終了"));
+
+                        IsEnabledInputListenPortTextBoxText = true;
+                        IsEnabledInputListenBackLogTextBoxText = true;
+                        IsEnabledInputReceiveTimeoutTextBoxText = true;
+
+                        IsEnabledServerStartServiceButton = true;
+                    }));
+
+                    IsSurvStartUpServiceRunning = false;
+                }
+            }
         }
 
         private void OnReceiveData(object sender, byte[] receivedData, ref byte[] sendData, ref bool isSendAll)
@@ -201,22 +374,6 @@ namespace ComLibDemo.ViewModels
         private void OnEndService()
         {
             ServerService.EndService();
-
-            OutputMsgList.Add(new OutputTextModel(">>サーバー処理終了"));
-
-            ReceiveDataEventInfo.RemoveEventHandler(ServerService, ReceiveEventHandler);
-            ReceiveDataEventInfo = null;
-
-            DisconnectedEventInfo.RemoveEventHandler(ServerService, DisconnectedEventHandler);
-            DisconnectedEventInfo = null;
-
-            ConnectedEventInfo.RemoveEventHandler(ServerService, ConnectedEventHandler);
-            ConnectedEventInfo = null;
-
-            SendEventInfo.RemoveEventHandler(ServerService, SendEventHandler);
-            SendEventInfo = null;
-
-            IsEnabledServerStartServiceButton = true;
         }
     }
 }
