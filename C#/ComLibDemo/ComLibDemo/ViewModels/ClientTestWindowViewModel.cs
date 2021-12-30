@@ -469,7 +469,7 @@ namespace ComLibDemo.ViewModels
         {
             while (IsSurvConnectedRunning)
             {
-                if (!Client.GetConnectedStatus())
+                if (!Client.IsConnected())
                 {
                     ReceiveDataEventInfo.RemoveEventHandler(Client, ReceiveEventHandler);
 
