@@ -207,10 +207,10 @@ namespace ComTCP
                     IsReceived = false
                 };
 
-                var start = DateTime.Now;
-
                 // 非同期ソケットを開始して、受信する
                 clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
+
+                var start = DateTime.Now;
 
                 while (state.IsReceiveTimeoutLoop)
                 {
@@ -292,10 +292,10 @@ namespace ComTCP
                         Send(clientSocket, sendData);
                     }
 
-                    var start = DateTime.Now;
-
                     // 非同期ソケットを開始して、受信する
                     clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
+
+                    var start = DateTime.Now;
 
                     state.IsReceiveTimeoutLoop = true;
 
