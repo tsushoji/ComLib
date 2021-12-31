@@ -387,8 +387,11 @@ namespace ComTCP
         {
             try
             {
-                // 非同期ソケットを開始して、送信する
-                clientSocket.BeginSend(data, 0, data.Length, 0, new AsyncCallback(SendCallback), clientSocket);
+                var byteSize = clientSocket.Send(data);
+
+                var clientIPEndPoint = (IPEndPoint)clientSocket.RemoteEndPoint;
+                // 送信イベント発生
+                OnServerSendData?.Invoke(this, new SendEventArgs(clientIPEndPoint.Address.ToString(), clientIPEndPoint.Port, byteSize));
             }
             catch (Exception ex)
             {
@@ -410,38 +413,6 @@ namespace ComTCP
             {
                 Send(ClientSockets[index], data);
                 index--;
-            }
-        }
-
-        /// <summary>
-        /// 送信時の非同期コールバック処理
-        /// </summary>
-        /// <param name="asyncResult">送信結果</param>
-        private void SendCallback(IAsyncResult asyncResult)
-        {
-            // サービス終了時は処理しない
-            if (!RunningListen)
-            {
-                return;
-            }
-
-            Socket clientSocket = null;
-
-            try
-            {
-                // クライアントソケットへのデータ送信処理を完了する
-                clientSocket = asyncResult.AsyncState as Socket;
-                var byteSize = clientSocket.EndSend(asyncResult);
-                var clientIPEndPoint = (IPEndPoint)clientSocket.RemoteEndPoint;
-                // 送信イベント発生
-                OnServerSendData?.Invoke(this, new SendEventArgs(clientIPEndPoint.Address.ToString(), clientIPEndPoint.Port, byteSize));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
-                System.Diagnostics.Debug.WriteLine(ex.Message);
-
-                RemoveClientSocket(clientSocket);
             }
         }
 
