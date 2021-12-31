@@ -8,13 +8,8 @@ using System.Threading.Tasks;
 
 namespace ComTCP
 {
-    public class TCPServer
+    public class TCPServer : TCPComBase
     {
-        /// <summary>
-        /// スレッド待機用
-        /// </summary>
-        private readonly ManualResetEvent connectMre = new ManualResetEvent(false);
-
         /// <summary>
         /// リッスンタスク
         /// </summary>
@@ -43,31 +38,60 @@ namespace ComTCP
         private SynchronizedCollection<Socket> ClientSockets { get; set; } = new SynchronizedCollection<Socket>();
 
         /// <summary>
-        /// 受信タイムアウトミリ秒
-        /// </summary>
-        private int ReceiveTimeoutMillSec { get; set; }
-
-        /// <summary>
         /// データ受信イベントハンドラー
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
-        /// <param name="receivedData">受信データ</param>
-        /// <param name="sendData">送信データ</param>
-        /// <param name="isSendAll">全接続済みクライアントへ送信するか</param>
-        public delegate void ReceiveEventHandler(object sender, byte[] receivedData, ref byte[] sendData, ref bool isSendAll);
+        /// <param name="receivedEventArgs">受信イベントデータ</param>
+        public delegate void ServerReceivedDataEventHandler(object sender, ServerReceivedEventArgs e);
 
         /// <summary>
         /// データ受信イベント
         /// </summary>
-        public event ReceiveEventHandler OnServerReceiveData;
+        public event ServerReceivedDataEventHandler OnServerReceivedData;
 
         /// <summary>
-        /// 切断イベントハンドラー
+        /// 受信イベントデータ
         /// </summary>
-        /// <param name="sender">イベント発生オブジェクト</param>
-        /// <param name="e">イベントデータ</param>
-        /// <param name="DisconnectedEndPoint">切断エンドポイント</param>
-        public delegate void DisconnectedEventHandler(object sender, EventArgs e, EndPoint DisconnectedEndPoint);
+        public class ServerReceivedEventArgs : EventArgs
+        {
+            /// <summary>
+            /// 受信先IP
+            /// </summary>
+            public string IP { get; }
+
+            /// <summary>
+            /// 受信先ポート
+            /// </summary>
+            public int Port { get; }
+
+            /// <summary>
+            /// 受信データ
+            /// </summary>
+            public byte[] ReceivedData { get; }
+
+            /// <summary>
+            /// 全接続済みクライアントへ送信するか
+            /// </summary>
+            public bool IsSendAll { get; set; } = false;
+
+            /// <summary>
+            /// 送信データ
+            /// </summary>
+            public byte[] SendData { get; set; } = new byte[1024];
+
+            /// <summary>
+            /// 引数付きコンストラクタ
+            /// </summary>
+            /// <param name="ip">受信先IP</param>
+            /// <param name="port">受信先ポート</param>
+            /// <param name="receivedData">受信データ</param>
+            internal ServerReceivedEventArgs(string ip, int port, byte[] receivedData)
+            {
+                IP = ip;
+                Port = port;
+                ReceivedData = receivedData;
+            }
+        }
 
         /// <summary>
         /// 切断イベント
@@ -75,29 +99,14 @@ namespace ComTCP
         public event DisconnectedEventHandler OnServerDisconnected;
 
         /// <summary>
-        /// 接続イベントハンドラー
-        /// </summary>
-        /// <param name="sender">イベント発生オブジェクト</param>
-        /// <param name="e">イベントデータ</param>
-        /// <param name="connectedEndPoint">接続エンドポイント</param>
-        public delegate void ConnectedEventHandler(object sender, EventArgs e, EndPoint connectedEndPoint);
-
-        /// <summary>
         /// 接続イベント
         /// </summary>
         public event ConnectedEventHandler OnServerConnected;
 
         /// <summary>
-        /// 送信イベントハンドラー
-        /// </summary>
-        /// <param name="byteSize">送信バイト数</param>
-        /// <param name="sendEndPoint">送信エンドポイント</param>
-        public delegate void SendEventHandler(int byteSize, EndPoint sendEndPoint);
-
-        /// <summary>
         /// 送信イベント
         /// </summary>
-        public event SendEventHandler OnServerSend;
+        public event SendDataEventHandler OnServerSendData;
 
         /// <summary>
         /// 引数付きコンストラクタ
@@ -114,7 +123,6 @@ namespace ComTCP
         /// </summary>
         ~TCPServer()
         {
-            connectMre.Dispose();
             ClientSockets = null;
         }
 
@@ -200,8 +208,10 @@ namespace ComTCP
                 // 接続中のクライアントを追加
                 ClientSockets.Add(clientSocket);
 
+                var clientIPEndPoint = (IPEndPoint)clientSocket.RemoteEndPoint;
+
                 // 接続イベント発生
-                OnServerConnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
+                OnServerConnected?.Invoke(this, new ConnectedEventArgs(clientIPEndPoint.Address.ToString(), clientIPEndPoint.Port));
 
                 state = new StateObject
                 {
@@ -279,21 +289,21 @@ namespace ComTCP
                         Thread.Sleep(100);
                     }
 
-                    var sendData = new byte[StateObject.BufferSize];
-                    bool isSendAll = false;
+                    var serverIPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
+                    var serverReceivedEventArgs = new ServerReceivedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port, state.Buffer);
 
                     // 受信イベント発生
-                    OnServerReceiveData?.Invoke(this, state.Buffer, ref sendData, ref isSendAll);
+                    OnServerReceivedData?.Invoke(this, serverReceivedEventArgs);
 
-                    if (isSendAll)
+                    if (serverReceivedEventArgs.IsSendAll)
                     {
                         // 全接続済みクライアントへ送信
-                        SendAllClient(sendData);
+                        SendAllClient(serverReceivedEventArgs.SendData);
                     }
                     else
                     {
                         // リクエストクライアントへ送信
-                        Send(clientSocket, sendData);
+                        Send(clientSocket, serverReceivedEventArgs.SendData);
                     }
 
                     // 非同期ソケットを開始して、受信する
@@ -422,8 +432,9 @@ namespace ComTCP
                 // クライアントソケットへのデータ送信処理を完了する
                 clientSocket = asyncResult.AsyncState as Socket;
                 var byteSize = clientSocket.EndSend(asyncResult);
+                var clientIPEndPoint = (IPEndPoint)clientSocket.RemoteEndPoint;
                 // 送信イベント発生
-                OnServerSend?.Invoke(byteSize, clientSocket.RemoteEndPoint);
+                OnServerSendData?.Invoke(this, new SendEventArgs(clientIPEndPoint.Address.ToString(), clientIPEndPoint.Port, byteSize));
             }
             catch (Exception ex)
             {
@@ -453,7 +464,8 @@ namespace ComTCP
             int index = ClientSockets.Count - 1;
             while (index > -1)
             {
-                OnServerDisconnected?.Invoke(this, new EventArgs(), ClientSockets[index].RemoteEndPoint);
+                var serverIPEndPoint = ClientSockets[index].RemoteEndPoint as IPEndPoint;
+                OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
 
                 ClientSockets.RemoveAt(index);
                 index--;
@@ -469,7 +481,8 @@ namespace ComTCP
         {
             if (ClientSockets.Contains(clientSocket))
             {
-                OnServerDisconnected?.Invoke(this, new EventArgs(), clientSocket.RemoteEndPoint);
+                var serverIPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
+                OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
 
                 clientSocket.Close();
                 ClientSockets.Remove(clientSocket);

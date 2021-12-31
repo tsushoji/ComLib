@@ -7,17 +7,17 @@ using System.Threading.Tasks;
 
 namespace ComTCP
 {
-    public class TCPClient
+    public class TCPClient : TCPComBase
     {
-        /// <summary>
-        /// 接続スレッド待機用
-        /// </summary>
-        private readonly ManualResetEvent connectMre = new ManualResetEvent(false);
-
         /// <summary>
         /// ソケット
         /// </summary>
         private Socket Socket { get; set; }
+
+        /// <summary>
+        /// サーバーのエンドポイント
+        /// </summary>
+        private IPEndPoint ServerIPEndPoint { get; set; }
 
         /// <summary>
         /// バッファーサイズ
@@ -45,11 +45,6 @@ namespace ComTCP
         private bool IsReceiveTimeoutLoop { get; set; }
 
         /// <summary>
-        /// 受信タイムアウトミリ秒
-        /// </summary>
-        private int ReceiveTimeoutMillSec { get; set; }
-
-        /// <summary>
         /// 送信時の非同期コールバック処理実行中か
         /// </summary>
         private bool IsSendCallbackRunning { get; set; }
@@ -70,36 +65,71 @@ namespace ComTCP
         private bool IsSendDone { get; set; }
 
         /// <summary>
-        /// 接続イベントハンドラー
-        /// </summary>
-        /// <param name="sender">イベント発生オブジェクト</param>
-        /// <param name="receivedData">受信データ</param>
-        /// <param name="connectedEndPoint">接続エンドポイント</param>
-        public delegate void ConnectEventHandler(object sender, EventArgs e, IPEndPoint connectedEndPoint);
-
-        /// <summary>
         /// 接続イベント
         /// </summary>
-        public event ConnectEventHandler OnClientConnected;
+        public event ConnectedEventHandler OnClientConnected;
+
+        /// <summary>
+        /// 送信イベント
+        /// </summary>
+        public event SendDataEventHandler OnClientSendData;
+
+        /// <summary>
+        /// 切断イベント
+        /// </summary>
+        public event DisconnectedEventHandler OnClientDisconnected;
 
         /// <summary>
         /// データ受信イベントハンドラー
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
-        /// <param name="receivedData">受信データ</param>
-        public delegate void ReceiveEventHandler(object sender, byte[] receivedData);
+        /// <param name="receivedEventArgs">受信イベントデータ</param>
+        public delegate void ClientReceivedDataEventHandler(object sender, ClientReceivedEventArgs e);
 
         /// <summary>
         /// データ受信イベント
         /// </summary>
-        public event ReceiveEventHandler OnClientReceiveData;
+        public event ClientReceivedDataEventHandler OnClientReceivedData;
+
+        /// <summary>
+        /// 受信イベントデータ
+        /// </summary>
+        public class ClientReceivedEventArgs : EventArgs
+        {
+            /// <summary>
+            /// 受信先IP
+            /// </summary>
+            public string IP { get; }
+
+            /// <summary>
+            /// 受信先ポート
+            /// </summary>
+            public int Port { get; }
+
+            /// <summary>
+            /// 受信データ
+            /// </summary>
+            public byte[] ReceivedData { get; }
+
+            /// <summary>
+            /// 引数付きコンストラクタ
+            /// </summary>
+            /// <param name="ip">受信先IP</param>
+            /// <param name="port">受信先ポート</param>
+            /// <param name="receivedData">受信データ</param>
+            internal ClientReceivedEventArgs(string ip, int port, byte[] receivedData)
+            {
+                IP = ip;
+                Port = port;
+                ReceivedData = receivedData;
+            }
+        }
 
         /// <summary>
         /// デストラクタ
         /// </summary>
         ~TCPClient()
         {
-            connectMre.Dispose();
             Buffer = null;
         }
 
@@ -117,7 +147,6 @@ namespace ComTCP
             ConnectTimeoutMillSec = connectTimeoutMillSec;
             ReceiveTimeoutMillSec = receiveTimeoutMillSec;
 
-            EndPoint ServerIPEndPoint;
             try
             {
                 // サーバーエンドポイント作成
@@ -218,7 +247,7 @@ namespace ComTCP
                         clientSocket.EndConnect(asyncResult);
 
                         // 接続イベント発生
-                        OnClientConnected?.Invoke(this, new EventArgs(), (IPEndPoint)clientSocket.RemoteEndPoint);
+                        OnClientConnected?.Invoke(this, new ConnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
 
                         return;
                     }
@@ -299,7 +328,7 @@ namespace ComTCP
                     IsReceiveDone = true;
 
                     // 受信イベント発生
-                    OnClientReceiveData?.Invoke(this, Buffer);
+                    OnClientReceivedData?.Invoke(this, new ClientReceivedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, Buffer));
 
                     // 呼び出し元スレッドが完了するまで待機
                     while (IsReceiveTimeoutLoop)
@@ -363,6 +392,8 @@ namespace ComTCP
                 IsConnectDone = false;
                 IsReceiveDone = false;
                 IsSendDone = false;
+
+                OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
             }
             catch (Exception ex)
             {
@@ -389,14 +420,14 @@ namespace ComTCP
                 while (IsSendCallbackRunning)
                 {
                     Thread.Sleep(100);
-                }
 
-                if (IsSendDone)
-                {
-                    // 送信成功
-                    IsSendDone = false;
+                    if (IsSendDone)
+                    {
+                        // 送信成功
+                        IsSendDone = false;
 
-                    return true;
+                        return true;
+                    }
                 }
             }
             catch (Exception ex)
@@ -424,6 +455,10 @@ namespace ComTCP
 
                 // 送信成功
                 IsSendDone = true;
+
+                var clientIPEndPoint = (IPEndPoint)clientSocket.RemoteEndPoint;
+                // 送信イベント発生
+                OnClientSendData?.Invoke(this, new SendEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, byteSize));
             }
             catch (Exception ex)
             {

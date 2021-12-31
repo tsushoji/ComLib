@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using static ComTCP.TCPClient;
+using static ComTCP.TCPComBase;
 
 namespace ComLibDemo.ViewModels
 {
@@ -264,13 +265,21 @@ namespace ComLibDemo.ViewModels
 
         private bool IsSurvConnectedRunning { get; set; } = false;
 
-        private EventInfo ReceiveDataEventInfo { get; set; }
+        private EventInfo ReceivedDataEventInfo { get; set; }
 
-        private Delegate ReceiveEventHandler { get; set; }
+        private Delegate ReceivedDataEventHandler { get; set; }
 
-        private EventInfo ConnectEventInfo { get; set; }
+        private EventInfo DisconnectedEventInfo { get; set; }
 
-        private Delegate ConnectEventHandler { get; set; }
+        private Delegate DisconnectedEventHandler { get; set; }
+
+        private EventInfo ConnectedEventInfo { get; set; }
+
+        private Delegate ConnectedEventHandler { get; set; }
+
+        private EventInfo SendDataEventInfo { get; set; }
+
+        private Delegate SendDataEventHandler { get; set; }
 
         private bool _isEnabledClientConnectButton = false;
         public bool IsEnabledClientConnectButton
@@ -287,7 +296,7 @@ namespace ComLibDemo.ViewModels
                 if (value)
                 {
                     IsEnabledClientDisconnectButton = false;
-                    IsEnabledClientSendDataButton = false;
+                    IsEnabledClientSendButton = false;
                 }
             }
         }
@@ -311,17 +320,17 @@ namespace ComLibDemo.ViewModels
             }
         }
 
-        private bool _isEnabledClientSendDataButton = false;
-        public bool IsEnabledClientSendDataButton
+        private bool _isEnabledClientSendButton = false;
+        public bool IsEnabledClientSendButton
         {
             get
             {
-                return _isEnabledClientSendDataButton;
+                return _isEnabledClientSendButton;
             }
 
             set
             {
-                SetProperty(ref _isEnabledClientSendDataButton, value);
+                SetProperty(ref _isEnabledClientSendButton, value);
             }
         }
 
@@ -329,14 +338,16 @@ namespace ComLibDemo.ViewModels
 
         public DelegateCommand ClientDisconnectClicked { get; private set; }
 
-        public DelegateCommand ClientSendDataClicked { get; private set; }
+        public DelegateCommand ClientSendClicked { get; private set; }
 
         public ClientTestWindowViewModel()
         {
             if (ImportDll())
             {
-                ReceiveDataEventInfo = TCPClient.GetEvent("OnClientReceiveData");
-                ConnectEventInfo = TCPClient.GetEvent("OnClientConnected");
+                ReceivedDataEventInfo = TCPClient.GetEvent("OnClientReceivedData");
+                DisconnectedEventInfo = TCPClient.GetEvent("OnClientDisconnected");
+                ConnectedEventInfo = TCPClient.GetEvent("OnClientConnected");
+                SendDataEventInfo = TCPClient.GetEvent("OnClientSendData");
                 SetEvent();
 
                 SetProperty(ref _isEnabledClientConnectButton, true);
@@ -347,10 +358,12 @@ namespace ComLibDemo.ViewModels
         {
             ClientConnectClicked = new DelegateCommand(OnConnect);
             ClientDisconnectClicked = new DelegateCommand(OnDisconnect);
-            ClientSendDataClicked = new DelegateCommand(OnSendData);
+            ClientSendClicked = new DelegateCommand(OnSend);
 
-            ReceiveEventHandler = new ReceiveEventHandler(OnReceiveData);
-            ConnectEventHandler = new ConnectEventHandler(OnConnected);
+            ReceivedDataEventHandler = new ClientReceivedDataEventHandler(OnReceivedData);
+            DisconnectedEventHandler = new DisconnectedEventHandler(OnDisconnected);
+            ConnectedEventHandler = new ConnectedEventHandler(OnConnected);
+            SendDataEventHandler = new SendDataEventHandler(OnSendData);
         }
 
         private bool ImportDll()
@@ -419,9 +432,10 @@ namespace ComLibDemo.ViewModels
                 return;
             }
 
-            ConnectEventInfo.AddEventHandler(Client, ConnectEventHandler);
-
-            ReceiveDataEventInfo.AddEventHandler(Client, ReceiveEventHandler);
+            ReceivedDataEventInfo.AddEventHandler(Client, ReceivedDataEventHandler);
+            DisconnectedEventInfo.AddEventHandler(Client, DisconnectedEventHandler);
+            ConnectedEventInfo.AddEventHandler(Client, ConnectedEventHandler);
+            SendDataEventInfo.AddEventHandler(Client, SendDataEventHandler);
 
             if (Client.Connect(IP, port, connectTimeout, receiveTimeout, reTryNum))
             {
@@ -436,7 +450,7 @@ namespace ComLibDemo.ViewModels
                 IsEnabledInputSendStringTextBoxText = true;
 
                 IsEnabledClientDisconnectButton = true;
-                IsEnabledClientSendDataButton = true;
+                IsEnabledClientSendButton = true;
 
                 IsSurvConnectedRunning = true;
                 SurvConnectedTask = Task.Factory.StartNew(() =>
@@ -449,20 +463,7 @@ namespace ComLibDemo.ViewModels
                 OutputMsgList.Add(new OutputTextModel(">>接続失敗"));
             }
 
-            ConnectEventInfo.RemoveEventHandler(Client, ConnectEventHandler);
-        }
-
-        private void OnConnected(object sender, EventArgs e, IPEndPoint connectedEndPoint)
-        {
-            var addres = connectedEndPoint.Address.ToString();
-            var port = connectedEndPoint.Port.ToString();
-            Application.Current.Dispatcher.Invoke(new Action(() =>
-            {
-                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected start"));
-                OutputMsgList.Add(new OutputTextModel($">>アドレス:{addres}"));
-                OutputMsgList.Add(new OutputTextModel($">>ポート:{port}"));
-                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));
-            }));
+            ConnectedEventInfo.RemoveEventHandler(Client, ConnectedEventHandler);
         }
 
         private void SurvConnected()
@@ -471,7 +472,9 @@ namespace ComLibDemo.ViewModels
             {
                 if (!Client.IsConnected())
                 {
-                    ReceiveDataEventInfo.RemoveEventHandler(Client, ReceiveEventHandler);
+                    ReceivedDataEventInfo.RemoveEventHandler(Client, ReceivedDataEventHandler);
+                    DisconnectedEventInfo.RemoveEventHandler(Client, DisconnectedEventHandler);
+                    SendDataEventInfo.RemoveEventHandler(Client, SendDataEventHandler);
 
                     Application.Current.Dispatcher.Invoke(new Action(() =>
                     {
@@ -500,8 +503,6 @@ namespace ComLibDemo.ViewModels
 
             Client.DisConnect();
 
-            ReceiveDataEventInfo.RemoveEventHandler(Client, ReceiveEventHandler);
-
             IsEnabledInputSendIPTextBoxText = true;
             IsEnabledInputSendPortTextBoxText = true;
             IsEnabledInputConnectTimeoutTextBoxText = true;
@@ -513,7 +514,7 @@ namespace ComLibDemo.ViewModels
             IsEnabledClientConnectButton = true;
         }
 
-        private void OnSendData()
+        private void OnSend()
         {
             string sendText = InputSendStringTextBoxText;
             byte[] sendData = System.Text.Encoding.UTF8.GetBytes(sendText);
@@ -527,15 +528,39 @@ namespace ComLibDemo.ViewModels
             }
         }
 
-        private void OnReceiveData(object sender, byte[] receivedData)
+        private void OnReceivedData(object sender, ClientReceivedEventArgs e)
         {
-            var data = System.Text.Encoding.UTF8.GetString(receivedData);
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
-                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceiveData start"));
-                OutputMsgList.Add(new OutputTextModel(">>受信データ"));
-                OutputMsgList.Add(new OutputTextModel($">>{data}"));
-                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceiveData end"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceivedData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceivedData end"));
+            }));
+        }
+
+        private void OnDisconnected(object sender, DisconnectedEventArgs e)
+        {
+            Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnDisconnected start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnDisconnected end"));
+            }));
+        }
+
+        private void OnConnected(object sender, ConnectedEventArgs e)
+        {
+            Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));
+            }));
+        }
+
+        private void OnSendData(object sender, SendEventArgs e)
+        {
+            Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnSendData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnSendData end"));
             }));
         }
     }

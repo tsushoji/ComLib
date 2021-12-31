@@ -7,6 +7,7 @@ using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
+using static ComTCP.TCPComBase;
 using static ComTCP.TCPServer;
 
 namespace ComLibDemo.ViewModels
@@ -143,9 +144,9 @@ namespace ComLibDemo.ViewModels
 
         private bool IsSurvStartUpServiceRunning { get; set; } = false;
 
-        private EventInfo ReceiveDataEventInfo { get; set; }
+        private EventInfo ReceivedDataEventInfo { get; set; }
 
-        private Delegate ReceiveEventHandler { get; set; }
+        private Delegate ReceivedDataEventHandler { get; set; }
 
         private EventInfo DisconnectedEventInfo { get; set; }
 
@@ -155,9 +156,9 @@ namespace ComLibDemo.ViewModels
 
         private Delegate ConnectedEventHandler { get; set; }
 
-        private EventInfo SendEventInfo { get; set; }
+        private EventInfo SendDataEventInfo { get; set; }
 
-        private Delegate SendEventHandler { get; set; }
+        private Delegate SendDataEventHandler { get; set; }
 
         private bool _isEnabledServerStartServiceButton = true;
         public bool IsEnabledServerStartServiceButton
@@ -211,10 +212,10 @@ namespace ComLibDemo.ViewModels
             ServerStartServiceClicked = new DelegateCommand(OnStartService);
             ServerEndServiceClicked = new DelegateCommand(OnEndService);
 
-            ReceiveEventHandler = new ReceiveEventHandler(OnReceiveData);
+            ReceivedDataEventHandler = new ServerReceivedDataEventHandler(OnReceivedData);
             DisconnectedEventHandler = new DisconnectedEventHandler(OnDisconnected);
             ConnectedEventHandler = new ConnectedEventHandler(OnConnected);
-            SendEventHandler = new SendEventHandler(OnSend);
+            SendDataEventHandler = new SendDataEventHandler(OnSendData);
         }
 
         private bool ImportDll(int port)
@@ -272,8 +273,8 @@ namespace ComLibDemo.ViewModels
                 return;
             }
 
-            ReceiveDataEventInfo = TCPServer.GetEvent("OnServerReceiveData");
-            ReceiveDataEventInfo.AddEventHandler(ServerService, ReceiveEventHandler);
+            ReceivedDataEventInfo = TCPServer.GetEvent("OnServerReceivedData");
+            ReceivedDataEventInfo.AddEventHandler(ServerService, ReceivedDataEventHandler);
 
             DisconnectedEventInfo = TCPServer.GetEvent("OnServerDisconnected");
             DisconnectedEventInfo.AddEventHandler(ServerService, DisconnectedEventHandler);
@@ -281,8 +282,8 @@ namespace ComLibDemo.ViewModels
             ConnectedEventInfo = TCPServer.GetEvent("OnServerConnected");
             ConnectedEventInfo.AddEventHandler(ServerService, ConnectedEventHandler);
 
-            SendEventInfo = TCPServer.GetEvent("OnServerSend");
-            SendEventInfo.AddEventHandler(ServerService, SendEventHandler);
+            SendDataEventInfo = TCPServer.GetEvent("OnServerSendData");
+            SendDataEventInfo.AddEventHandler(ServerService, SendDataEventHandler);
 
             ServerService.StartService(listenBackLog, receiveTimeout);
 
@@ -307,8 +308,8 @@ namespace ComLibDemo.ViewModels
             {
                 if (!ServerService.IsServiceRunning())
                 {
-                    ReceiveDataEventInfo.RemoveEventHandler(ServerService, ReceiveEventHandler);
-                    ReceiveDataEventInfo = null;
+                    ReceivedDataEventInfo.RemoveEventHandler(ServerService, ReceivedDataEventHandler);
+                    ReceivedDataEventInfo = null;
 
                     DisconnectedEventInfo.RemoveEventHandler(ServerService, DisconnectedEventHandler);
                     DisconnectedEventInfo = null;
@@ -316,8 +317,8 @@ namespace ComLibDemo.ViewModels
                     ConnectedEventInfo.RemoveEventHandler(ServerService, ConnectedEventHandler);
                     ConnectedEventInfo = null;
 
-                    SendEventInfo.RemoveEventHandler(ServerService, SendEventHandler);
-                    SendEventInfo = null;
+                    SendDataEventInfo.RemoveEventHandler(ServerService, SendDataEventHandler);
+                    SendDataEventInfo = null;
 
                     Application.Current.Dispatcher.Invoke(new Action(() =>
                     {
@@ -335,16 +336,16 @@ namespace ComLibDemo.ViewModels
             }
         }
 
-        private void OnReceiveData(object sender, byte[] receivedData, ref byte[] sendData, ref bool isSendAll)
+        private void OnReceivedData(object sender, ServerReceivedEventArgs e)
         {
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
-                OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceiveData start"));
-                OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceiveData end"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceivedData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceivedData end"));
             }));
         }
 
-        private void OnDisconnected(object sender, EventArgs e, EndPoint disconnectedEndPoint)
+        private void OnDisconnected(object sender, DisconnectedEventArgs e)
         {
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
@@ -353,7 +354,7 @@ namespace ComLibDemo.ViewModels
             }));
         }
 
-        private void OnConnected(object sender, EventArgs e, EndPoint connectedEndPoint)
+        private void OnConnected(object sender, ConnectedEventArgs e)
         {
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
@@ -362,12 +363,12 @@ namespace ComLibDemo.ViewModels
             }));
         }
 
-        private void OnSend(int byteSize, EndPoint sendEndPoint)
+        private void OnSendData(object sender, SendEventArgs e)
         {
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
-                OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnSend start"));
-                OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnSend end"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnSendData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnSendData end"));
             }));
         }
 

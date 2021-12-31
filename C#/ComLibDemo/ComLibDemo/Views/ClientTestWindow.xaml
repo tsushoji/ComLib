@@ -71,7 +71,7 @@
             <Label Grid.Column="5" Grid.Row="5" Grid.ColumnSpan="3" Content="送信文字列" FontSize="10"/>
             <TextBox Grid.Column="5" Grid.Row="6" Grid.ColumnSpan="3" Grid.RowSpan="2" Text="{Binding InputSendStringTextBoxText}"
                      IsEnabled="{Binding IsEnabledInputSendStringTextBoxText}" IsReadOnly="{Binding IsReadOnlyInputSendStringTextBoxText}"/>
-            <Button Grid.Column="9" Grid.Row="5" Grid.ColumnSpan="3" Grid.RowSpan="3" Content="送信" Command="{Binding ClientSendDataClicked}" IsEnabled="{Binding IsEnabledClientSendDataButton}"/>
+            <Button Grid.Column="9" Grid.Row="5" Grid.ColumnSpan="3" Grid.RowSpan="3" Content="送信" Command="{Binding ClientSendClicked}" IsEnabled="{Binding IsEnabledClientSendButton}"/>
         </Grid>
     </Grid>
 </Window>
