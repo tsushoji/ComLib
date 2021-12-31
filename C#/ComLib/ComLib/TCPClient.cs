@@ -10,6 +10,11 @@ namespace ComTCP
     public class TCPClient : TCPComBase
     {
         /// <summary>
+        /// 送信スレッド待機用
+        /// </summary>
+        protected readonly ManualResetEvent clientSendMre = new ManualResetEvent(false);
+
+        /// <summary>
         /// ソケット
         /// </summary>
         private Socket Socket { get; set; }
@@ -43,11 +48,6 @@ namespace ComTCP
         /// 受信タイムアウトループするか
         /// </summary>
         private bool IsReceiveTimeoutLoop { get; set; }
-
-        /// <summary>
-        /// 送信時の非同期コールバック処理実行中か
-        /// </summary>
-        private bool IsSendCallbackRunning { get; set; }
 
         /// <summary>
         /// 接続したか
@@ -130,6 +130,7 @@ namespace ComTCP
         /// </summary>
         ~TCPClient()
         {
+            clientSendMre.Dispose();
             Buffer = null;
         }
 
@@ -286,7 +287,10 @@ namespace ComTCP
                     if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                     {
                         // 受信タイムアウト
-                        DisConnect();
+                        if (Socket != null && Socket.Connected)
+                        {
+                            DisConnect();
+                        }
                         break;
                     }
 
@@ -350,7 +354,10 @@ namespace ComTCP
                         if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                         {
                             // 受信タイムアウト
-                            DisConnect();
+                            if (Socket != null && Socket.Connected)
+                            {
+                                DisConnect();
+                            }
                             break;
                         }
 
@@ -411,24 +418,11 @@ namespace ComTCP
         {
             try
             {
-                IsSendCallbackRunning = true;
+                var byteSize = Socket.Send(data);
 
-                // 非同期ソケットを開始して、送信する
-                Socket.BeginSend(data, 0, data.Length, 0, new AsyncCallback(SendCallback), Socket);
-
-                // 送信時の非同期コールバック処理が完了するまで待機
-                while (IsSendCallbackRunning)
-                {
-                    Thread.Sleep(100);
-
-                    if (IsSendDone)
-                    {
-                        // 送信成功
-                        IsSendDone = false;
-
-                        return true;
-                    }
-                }
+                var clientIPEndPoint = (IPEndPoint)Socket.RemoteEndPoint;
+                // 送信イベント発生
+                OnClientSendData?.Invoke(this, new SendEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, byteSize));
             }
             catch (Exception ex)
             {
@@ -438,37 +432,7 @@ namespace ComTCP
                 return false;
             }
 
-            return false;
-        }
-
-        /// <summary>
-        /// 送信時の非同期コールバック処理
-        /// </summary>
-        /// <param name="asyncResult">送信結果</param>
-        private void SendCallback(IAsyncResult asyncResult)
-        {
-            try
-            {
-                // クライアントソケットへのデータ送信処理を完了する
-                var clientSocket = asyncResult.AsyncState as Socket;
-                var byteSize = clientSocket.EndSend(asyncResult);
-
-                // 送信成功
-                IsSendDone = true;
-
-                var clientIPEndPoint = (IPEndPoint)clientSocket.RemoteEndPoint;
-                // 送信イベント発生
-                OnClientSendData?.Invoke(this, new SendEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, byteSize));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
-                System.Diagnostics.Debug.WriteLine(ex.Message);
-            }
-            finally
-            {
-                IsSendCallbackRunning = false;
-            }
+            return true;
         }
 
         /// <summary>

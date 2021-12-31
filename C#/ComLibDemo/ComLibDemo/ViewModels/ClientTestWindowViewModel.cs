@@ -3,9 +3,9 @@ using Prism.Commands;
 using Prism.Mvvm;
 using System;
 using System.Collections.ObjectModel;
-using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using static ComTCP.TCPClient;
@@ -460,10 +460,13 @@ namespace ComLibDemo.ViewModels
             }
             else
             {
+                ReceivedDataEventInfo.RemoveEventHandler(Client, ReceivedDataEventHandler);
+                DisconnectedEventInfo.RemoveEventHandler(Client, DisconnectedEventHandler);
+                ConnectedEventInfo.RemoveEventHandler(Client, ConnectedEventHandler);
+                SendDataEventInfo.RemoveEventHandler(Client, SendDataEventHandler);
+
                 OutputMsgList.Add(new OutputTextModel(">>接続失敗"));
             }
-
-            ConnectedEventInfo.RemoveEventHandler(Client, ConnectedEventHandler);
         }
 
         private void SurvConnected()
@@ -474,44 +477,36 @@ namespace ComLibDemo.ViewModels
                 {
                     ReceivedDataEventInfo.RemoveEventHandler(Client, ReceivedDataEventHandler);
                     DisconnectedEventInfo.RemoveEventHandler(Client, DisconnectedEventHandler);
+                    ConnectedEventInfo.RemoveEventHandler(Client, ConnectedEventHandler);
                     SendDataEventInfo.RemoveEventHandler(Client, SendDataEventHandler);
 
                     Application.Current.Dispatcher.Invoke(new Action(() =>
                     {
                         OutputMsgList.Add(new OutputTextModel(">>切断"));
-
-                        IsEnabledInputSendIPTextBoxText = true;
-                        IsEnabledInputSendPortTextBoxText = true;
-                        IsEnabledInputConnectTimeoutTextBoxText = true;
-                        IsEnabledInputReceiveTimeoutTextBoxText = true;
-                        IsEnabledInputReTryNumTextBoxText = true;
-
-                        IsReadOnlyInputSendStringTextBoxText = true;
-
-                        IsEnabledClientConnectButton = true;
                     }));
 
-                    IsSurvConnectedRunning = false;
+                    IsEnabledInputSendIPTextBoxText = true;
+                    IsEnabledInputSendPortTextBoxText = true;
+                    IsEnabledInputConnectTimeoutTextBoxText = true;
+                    IsEnabledInputReceiveTimeoutTextBoxText = true;
+                    IsEnabledInputReTryNumTextBoxText = true;
+
+                    IsReadOnlyInputSendStringTextBoxText = true;
+
+                    IsEnabledClientConnectButton = true;
+
+                    break;
                 }
+
+                Thread.Sleep(100);
             }
+
+            IsSurvConnectedRunning = false;
         }
 
         private void OnDisconnect()
         {
-            IsSurvConnectedRunning = false;
-            SurvConnectedTask.Wait();
-
             Client.DisConnect();
-
-            IsEnabledInputSendIPTextBoxText = true;
-            IsEnabledInputSendPortTextBoxText = true;
-            IsEnabledInputConnectTimeoutTextBoxText = true;
-            IsEnabledInputReceiveTimeoutTextBoxText = true;
-            IsEnabledInputReTryNumTextBoxText = true;
-
-            IsReadOnlyInputSendStringTextBoxText = true;
-
-            IsEnabledClientConnectButton = true;
         }
 
         private void OnSend()
