@@ -46,49 +46,15 @@ namespace ComTCP
         /// データ受信イベントハンドラー
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
-        /// <param name="receivedEventArgs">受信イベントデータ</param>
+        /// <param name="e">受信イベントデータ</param>
         /// <param name="sendData">送信データ</param>
         /// <param name="isSendAll">全接続済みクライアントへ送信するか</param>
-        public delegate void ServerReceivedDataEventHandler(object sender, ServerReceivedEventArgs e, ref byte[] sendData, ref bool isSendAll);
+        public delegate void ServerReceivedDataEventHandler(object sender, ReceivedEventArgs e, ref byte[] sendData, ref bool isSendAll);
 
         /// <summary>
         /// データ受信イベント
         /// </summary>
         public event ServerReceivedDataEventHandler OnServerReceivedData;
-
-        /// <summary>
-        /// 受信イベントデータ
-        /// </summary>
-        public class ServerReceivedEventArgs : EventArgs
-        {
-            /// <summary>
-            /// 受信元IP
-            /// </summary>
-            public string IP { get; }
-
-            /// <summary>
-            /// 受信元ポート
-            /// </summary>
-            public int Port { get; }
-
-            /// <summary>
-            /// 受信データ
-            /// </summary>
-            public byte[] ReceivedData { get; }
-
-            /// <summary>
-            /// 引数付きコンストラクタ
-            /// </summary>
-            /// <param name="ip">受信元IP</param>
-            /// <param name="port">受信元ポート</param>
-            /// <param name="receivedData">受信データ</param>
-            internal ServerReceivedEventArgs(string ip, int port, byte[] receivedData)
-            {
-                IP = ip;
-                Port = port;
-                ReceivedData = receivedData;
-            }
-        }
 
         /// <summary>
         /// 切断イベント
@@ -207,8 +173,11 @@ namespace ComTCP
                 var listenerSocket = asyncResult.AsyncState as Socket;
                 clientSocket = listenerSocket.EndAccept(asyncResult);
 
-                // 接続中のクライアントを追加
-                ClientSockets.Add(clientSocket);
+                lock (SocketLockObj)
+                {
+                    // 接続中のクライアントを追加
+                    ClientSockets.Add(clientSocket);
+                }
 
                 var clientIPEndPoint = (IPEndPoint)clientSocket.RemoteEndPoint;
 
@@ -235,7 +204,14 @@ namespace ComTCP
                         // 受信タイムアウト
                         if (clientSocket != null && clientSocket.Connected)
                         {
-                            RemoveClientSocket(clientSocket);
+                            lock (SocketLockObj)
+                            {
+                                var IPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
+                                OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(IPEndPoint.Address.ToString(), IPEndPoint.Port));
+
+                                clientSocket.Close();
+                                ClientSockets.Remove(clientSocket);
+                            }
                         }
 
                         break;
@@ -254,11 +230,6 @@ namespace ComTCP
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
-
-                //if (clientSocket != null && clientSocket.Connected)
-                //{
-                //    RemoveClientSocket(clientSocket);
-                //}
             }
             finally
             {
@@ -296,7 +267,7 @@ namespace ComTCP
                     Array.Copy(state.Buffer, 0, receivedData, 0, bytes);
 
                     var serverIPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
-                    var serverReceivedEventArgs = new ServerReceivedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port, receivedData);
+                    var serverReceivedEventArgs = new ReceivedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port, receivedData);
 
                     bool isSendAll = false;
                     byte[] sendData = null;
@@ -338,7 +309,13 @@ namespace ComTCP
                             // 受信タイムアウト
                             if (clientSocket != null && clientSocket.Connected)
                             {
-                                RemoveClientSocket(clientSocket);
+                                lock (SocketLockObj)
+                                {
+                                    var IPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
+                                    OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(IPEndPoint.Address.ToString(), IPEndPoint.Port));
+                                    clientSocket.Close();
+                                    ClientSockets.Remove(clientSocket);
+                                }
                             }
 
                             break;
@@ -358,11 +335,6 @@ namespace ComTCP
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
-
-                //if (clientSocket != null && clientSocket.Connected)
-                //{
-                //    RemoveClientSocket(clientSocket);
-                //}
             }
             finally
             {
@@ -420,8 +392,6 @@ namespace ComTCP
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
-
-                //RemoveClientSocket(clientSocket);
             }
         }
 
@@ -460,62 +430,57 @@ namespace ComTCP
             TaskListen = null;
 
             // 保持しているすべての接続済みクライアント情報を削除
-            //int index = ClientSockets.Count - 1;
-            //while (index > -1)
-            //{
-            //    var serverIPEndPoint = ClientSockets[index].RemoteEndPoint as IPEndPoint;
-            //    OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
+            int index = ClientSockets.Count - 1;
+            while (index > -1)
+            {
+                var socket = ClientSockets[index];
+                var serverIPEndPoint = socket.RemoteEndPoint as IPEndPoint;
+                OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
 
-            //    ClientSockets.RemoveAt(index);
-            //    index--;
-            //}
+                socket.Close();
+                ClientSockets.RemoveAt(index);
+                index--;
+            }
         }
 
         /// <summary>
         /// ソケット状態を確認
-        /// 受信完了後、クライアントが切断されたときの対策
+        /// 接続完了後、クライアントが切断されたときの対策
         /// </summary>
         private void PollSocket()
         {
             while (RunningListen)
             {
-                var index = ClientSockets.Count - 1;
-                while (index > -1)
+                try
                 {
-                    if (!ClientSockets[index].Connected)
+                    lock (SocketLockObj)
                     {
-                        var serverIPEndPoint = ClientSockets[index].RemoteEndPoint as IPEndPoint;
-                        OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
+                        var index = ClientSockets.Count - 1;
+                        while (index > -1)
+                        {
+                            var clientSocket = ClientSockets[index];
 
-                        ClientSockets.RemoveAt(index);
+                            if (clientSocket.Poll(1000000, SelectMode.SelectRead) && (clientSocket.Available == 0))
+                            {
+                                // クライアントから切断されたソケット検知
+                                var serverIPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
+                                OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
+
+                                ClientSockets.RemoveAt(index);
+                            }
+
+                            index--;
+                        }
                     }
 
-                    index--;
+                    Task.Delay(5000);
                 }
-
-                Task.Delay(3000);
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                    System.Diagnostics.Debug.WriteLine(ex.Message);
+                }
             }
-        }
-
-        /// <summary>
-        /// 保持している指定クライアント情報を削除
-        /// </summary>
-        /// <param name="clientSocket">クライアントソケット</param>
-        /// <returns>削除したとき、true それ以外のとき、false</returns>
-        private bool RemoveClientSocket(Socket clientSocket)
-        {
-            if (ClientSockets.Contains(clientSocket))
-            {
-                var serverIPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
-                OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
-
-                clientSocket.Close();
-                ClientSockets.Remove(clientSocket);
-
-                return true;
-            }
-
-            return false;
         }
 
         /// <summary>

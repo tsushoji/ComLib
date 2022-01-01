@@ -142,8 +142,6 @@ namespace ComLibDemo.ViewModels
 
         private Task SurvStartUpServiceTask { get; set; }
 
-        private bool IsSurvStartUpServiceRunning { get; set; } = false;
-
         private EventInfo ReceivedDataEventInfo { get; set; }
 
         private Delegate ReceivedDataEventHandler { get; set; }
@@ -294,49 +292,9 @@ namespace ComLibDemo.ViewModels
             IsReadOnlyInputReceiveTimeoutTextBoxText = true;
 
             IsEnabledServerEndServiceButton = true;
-
-            IsSurvStartUpServiceRunning = true;
-            SurvStartUpServiceTask = Task.Factory.StartNew(() =>
-            {
-                SurvConnected();
-            });
         }
 
-        private void SurvConnected()
-        {
-            while (IsSurvStartUpServiceRunning)
-            {
-                if (!ServerService.IsServiceRunning())
-                {
-                    ReceivedDataEventInfo.RemoveEventHandler(ServerService, ReceivedDataEventHandler);
-                    ReceivedDataEventInfo = null;
-
-                    DisconnectedEventInfo.RemoveEventHandler(ServerService, DisconnectedEventHandler);
-                    DisconnectedEventInfo = null;
-
-                    ConnectedEventInfo.RemoveEventHandler(ServerService, ConnectedEventHandler);
-                    ConnectedEventInfo = null;
-
-                    SendDataEventInfo.RemoveEventHandler(ServerService, SendDataEventHandler);
-                    SendDataEventInfo = null;
-
-                    Application.Current.Dispatcher.Invoke(new Action(() =>
-                    {
-                        OutputMsgList.Add(new OutputTextModel(">>サーバー処理終了"));
-                    }));
-
-                    IsEnabledInputListenPortTextBoxText = true;
-                    IsEnabledInputListenBackLogTextBoxText = true;
-                    IsEnabledInputReceiveTimeoutTextBoxText = true;
-
-                    IsEnabledServerStartServiceButton = true;
-
-                    IsSurvStartUpServiceRunning = false;
-                }
-            }
-        }
-
-        private void OnReceivedData(object sender, ServerReceivedEventArgs e, ref byte[] sendData, ref bool isSendAll)
+        private void OnReceivedData(object sender, ReceivedEventArgs e, ref byte[] sendData, ref bool isSendAll)
         {
             var receivedIP = e.IP;
             var receivedPort = e.Port;
@@ -420,6 +378,29 @@ namespace ComLibDemo.ViewModels
         private void OnEndService()
         {
             ServerService.EndService();
+
+            ReceivedDataEventInfo.RemoveEventHandler(ServerService, ReceivedDataEventHandler);
+            ReceivedDataEventInfo = null;
+
+            DisconnectedEventInfo.RemoveEventHandler(ServerService, DisconnectedEventHandler);
+            DisconnectedEventInfo = null;
+
+            ConnectedEventInfo.RemoveEventHandler(ServerService, ConnectedEventHandler);
+            ConnectedEventInfo = null;
+
+            SendDataEventInfo.RemoveEventHandler(ServerService, SendDataEventHandler);
+            SendDataEventInfo = null;
+
+            Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                OutputMsgList.Add(new OutputTextModel(">>サーバー処理終了"));
+            }));
+
+            IsEnabledInputListenPortTextBoxText = true;
+            IsEnabledInputListenBackLogTextBoxText = true;
+            IsEnabledInputReceiveTimeoutTextBoxText = true;
+
+            IsEnabledServerStartServiceButton = true;
         }
     }
 }

@@ -12,7 +12,7 @@ namespace ComTCP
         /// <summary>
         /// 送信スレッド待機用
         /// </summary>
-        protected readonly ManualResetEvent clientSendMre = new ManualResetEvent(false);
+        private readonly ManualResetEvent clientSendMre = new ManualResetEvent(false);
 
         /// <summary>
         /// ソケット
@@ -60,11 +60,6 @@ namespace ComTCP
         private bool IsReceiveDone { get; set; }
 
         /// <summary>
-        /// 送信したか
-        /// </summary>
-        private bool IsSendDone { get; set; }
-
-        /// <summary>
         /// 接続イベント
         /// </summary>
         public event ConnectedEventHandler OnClientConnected;
@@ -83,47 +78,13 @@ namespace ComTCP
         /// データ受信イベントハンドラー
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
-        /// <param name="receivedEventArgs">受信イベントデータ</param>
-        public delegate void ClientReceivedDataEventHandler(object sender, ClientReceivedEventArgs e);
+        /// <param name="e">受信イベントデータ</param>
+        public delegate void ClientReceivedDataEventHandler(object sender, ReceivedEventArgs e);
 
         /// <summary>
         /// データ受信イベント
         /// </summary>
         public event ClientReceivedDataEventHandler OnClientReceivedData;
-
-        /// <summary>
-        /// 受信イベントデータ
-        /// </summary>
-        public class ClientReceivedEventArgs : EventArgs
-        {
-            /// <summary>
-            /// 受信元IP
-            /// </summary>
-            public string IP { get; }
-
-            /// <summary>
-            /// 受信元ポート
-            /// </summary>
-            public int Port { get; }
-
-            /// <summary>
-            /// 受信データ
-            /// </summary>
-            public byte[] ReceivedData { get; }
-
-            /// <summary>
-            /// 引数付きコンストラクタ
-            /// </summary>
-            /// <param name="ip">受信元IP</param>
-            /// <param name="port">受信元ポート</param>
-            /// <param name="receivedData">受信データ</param>
-            internal ClientReceivedEventArgs(string ip, int port, byte[] receivedData)
-            {
-                IP = ip;
-                Port = port;
-                ReceivedData = receivedData;
-            }
-        }
 
         /// <summary>
         /// デストラクタ
@@ -332,7 +293,7 @@ namespace ComTCP
                     IsReceiveDone = true;
 
                     // 受信イベント発生
-                    OnClientReceivedData?.Invoke(this, new ClientReceivedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, Buffer));
+                    OnClientReceivedData?.Invoke(this, new ReceivedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, Buffer));
 
                     // 呼び出し元スレッドが完了するまで待機
                     while (IsReceiveTimeoutLoop)
@@ -387,18 +348,20 @@ namespace ComTCP
         {
             try
             {
-                // ソケット終了
-                Socket?.Shutdown(SocketShutdown.Both);
-                Socket?.Disconnect(false);
-                Socket?.Dispose();
-                Socket = null;
+                lock (SocketLockObj) 
+                {
+                    // ソケット終了
+                    Socket?.Shutdown(SocketShutdown.Both);
+                    Socket?.Disconnect(false);
+                    Socket?.Dispose();
+                    Socket = null;
+                }
 
                 IsConnectTimeoutLoop = false;
                 IsReceiveTimeoutLoop = false;
 
                 IsConnectDone = false;
                 IsReceiveDone = false;
-                IsSendDone = false;
 
                 OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
             }
@@ -441,9 +404,23 @@ namespace ComTCP
         /// <returns>接続されているとき、true それ以外のとき、false</returns>
         public bool IsConnected()
         {
-            if (Socket != null)
+            lock (SocketLockObj)
             {
-                return Socket.Connected;
+                if (Socket != null)
+                {
+                    if (!Socket.Connected)
+                    {
+                        return false;
+                    }
+
+                    if (Socket.Poll(1000000, SelectMode.SelectRead) && (Socket.Available == 0))
+                    {
+                        // 接続完了後、サーバーから切断されたソケット検知
+                        return false;
+                    }
+
+                    return true;
+                }
             }
 
             return false;

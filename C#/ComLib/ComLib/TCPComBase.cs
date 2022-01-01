@@ -17,6 +17,11 @@ namespace ComTCP
         protected int ReceiveTimeoutMillSec { get; set; }
 
         /// <summary>
+        /// ソケットロックオブジェクト
+        /// </summary>
+        protected object SocketLockObj { get; set; } = new object();
+
+        /// <summary>
         /// 接続イベントハンドラー
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
@@ -125,9 +130,44 @@ namespace ComTCP
             }
         }
 
+        /// <summary>
+        /// 受信イベントデータ
+        /// </summary>
+        public class ReceivedEventArgs : EventArgs
+        {
+            /// <summary>
+            /// 受信元IP
+            /// </summary>
+            public string IP { get; }
+
+            /// <summary>
+            /// 受信元ポート
+            /// </summary>
+            public int Port { get; }
+
+            /// <summary>
+            /// 受信データ
+            /// </summary>
+            public byte[] ReceivedData { get; }
+
+            /// <summary>
+            /// 引数付きコンストラクタ
+            /// </summary>
+            /// <param name="ip">受信元IP</param>
+            /// <param name="port">受信元ポート</param>
+            /// <param name="receivedData">受信データ</param>
+            internal ReceivedEventArgs(string ip, int port, byte[] receivedData)
+            {
+                IP = ip;
+                Port = port;
+                ReceivedData = receivedData;
+            }
+        }
+
         ~TCPComBase()
         {
             connectMre.Dispose();
+            SocketLockObj = null;
         }
     }
 }

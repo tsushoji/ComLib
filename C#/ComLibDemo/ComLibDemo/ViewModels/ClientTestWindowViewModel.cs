@@ -524,7 +524,7 @@ namespace ComLibDemo.ViewModels
             }
         }
 
-        private void OnReceivedData(object sender, ClientReceivedEventArgs e)
+        private void OnReceivedData(object sender, ReceivedEventArgs e)
         {
             var receivedIP = e.IP;
             var receivedPort = e.Port;
