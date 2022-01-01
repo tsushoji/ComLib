@@ -97,12 +97,12 @@ namespace ComTCP
         public class ClientReceivedEventArgs : EventArgs
         {
             /// <summary>
-            /// 受信先IP
+            /// 受信元IP
             /// </summary>
             public string IP { get; }
 
             /// <summary>
-            /// 受信先ポート
+            /// 受信元ポート
             /// </summary>
             public int Port { get; }
 
@@ -114,8 +114,8 @@ namespace ComTCP
             /// <summary>
             /// 引数付きコンストラクタ
             /// </summary>
-            /// <param name="ip">受信先IP</param>
-            /// <param name="port">受信先ポート</param>
+            /// <param name="ip">受信元IP</param>
+            /// <param name="port">受信元ポート</param>
             /// <param name="receivedData">受信データ</param>
             internal ClientReceivedEventArgs(string ip, int port, byte[] receivedData)
             {

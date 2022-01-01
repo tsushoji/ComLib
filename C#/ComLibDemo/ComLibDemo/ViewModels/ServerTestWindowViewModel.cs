@@ -3,8 +3,8 @@ using Prism.Commands;
 using Prism.Mvvm;
 using System;
 using System.Collections.ObjectModel;
-using System.Net;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using static ComTCP.TCPComBase;
@@ -323,51 +323,96 @@ namespace ComLibDemo.ViewModels
                     Application.Current.Dispatcher.Invoke(new Action(() =>
                     {
                         OutputMsgList.Add(new OutputTextModel(">>サーバー処理終了"));
-
-                        IsEnabledInputListenPortTextBoxText = true;
-                        IsEnabledInputListenBackLogTextBoxText = true;
-                        IsEnabledInputReceiveTimeoutTextBoxText = true;
-
-                        IsEnabledServerStartServiceButton = true;
                     }));
+
+                    IsEnabledInputListenPortTextBoxText = true;
+                    IsEnabledInputListenBackLogTextBoxText = true;
+                    IsEnabledInputReceiveTimeoutTextBoxText = true;
+
+                    IsEnabledServerStartServiceButton = true;
 
                     IsSurvStartUpServiceRunning = false;
                 }
             }
         }
 
-        private void OnReceivedData(object sender, ServerReceivedEventArgs e)
+        private void OnReceivedData(object sender, ServerReceivedEventArgs e, ref byte[] sendData, ref bool isSendAll)
         {
+            var receivedIP = e.IP;
+            var receivedPort = e.Port;
+            var receivedStr = Encoding.UTF8.GetString(e.ReceivedData);
+
+            SetSendData(receivedStr, ref sendData, ref isSendAll);
+
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceivedData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:IP " + receivedIP));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:ポート " + receivedPort));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:送信バイト数 " + receivedStr));
                 OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnReceivedData end"));
             }));
         }
 
+        private void SetSendData(string str, ref byte[] sendData, ref bool isSendAll)
+        {
+            switch (str)
+            {
+                case "test1":
+                    sendData = Encoding.UTF8.GetBytes(str);
+                    isSendAll = false;
+                    break;
+
+                case "test2":
+                    sendData = Encoding.UTF8.GetBytes(str);
+                    isSendAll = true;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
         private void OnDisconnected(object sender, DisconnectedEventArgs e)
         {
+            var disconnectedIP = e.IP;
+            var disconnectedPort = e.Port;
+
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnDisconnected start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:IP " + disconnectedIP));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:ポート " + disconnectedPort));
                 OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnDisconnected end"));
             }));
         }
 
         private void OnConnected(object sender, ConnectedEventArgs e)
         {
+            var connectedIP = e.IP;
+            var connectedPort = e.Port;
+
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnConnected start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:IP " + connectedIP));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:ポート " + connectedPort));
                 OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnConnected end"));
             }));
         }
 
         private void OnSendData(object sender, SendEventArgs e)
         {
+            var sendIP = e.IP;
+            var sendPort = e.Port;
+            var sendByteNum = e.SendByteNum;
+
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnSendData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:IP " + sendIP));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:ポート " + sendPort));
+                OutputMsgList.Add(new OutputTextModel(">>TCPServer:送信バイト数 " + sendByteNum));
                 OutputMsgList.Add(new OutputTextModel(">>TCPServer:OnSendData end"));
             }));
         }

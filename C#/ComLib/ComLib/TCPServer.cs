@@ -16,6 +16,11 @@ namespace ComTCP
         private Task TaskListen { get; set; }
 
         /// <summary>
+        /// ポールソケットタスク
+        /// </summary>
+        private Task TaskPollSocket { get; set; }
+
+        /// <summary>
         /// サーバーのエンドポイント
         /// </summary>
         private IPEndPoint IPEndPoint { get; set; }
@@ -42,7 +47,9 @@ namespace ComTCP
         /// </summary>
         /// <param name="sender">イベント発生オブジェクト</param>
         /// <param name="receivedEventArgs">受信イベントデータ</param>
-        public delegate void ServerReceivedDataEventHandler(object sender, ServerReceivedEventArgs e);
+        /// <param name="sendData">送信データ</param>
+        /// <param name="isSendAll">全接続済みクライアントへ送信するか</param>
+        public delegate void ServerReceivedDataEventHandler(object sender, ServerReceivedEventArgs e, ref byte[] sendData, ref bool isSendAll);
 
         /// <summary>
         /// データ受信イベント
@@ -55,12 +62,12 @@ namespace ComTCP
         public class ServerReceivedEventArgs : EventArgs
         {
             /// <summary>
-            /// 受信先IP
+            /// 受信元IP
             /// </summary>
             public string IP { get; }
 
             /// <summary>
-            /// 受信先ポート
+            /// 受信元ポート
             /// </summary>
             public int Port { get; }
 
@@ -70,20 +77,10 @@ namespace ComTCP
             public byte[] ReceivedData { get; }
 
             /// <summary>
-            /// 全接続済みクライアントへ送信するか
-            /// </summary>
-            public bool IsSendAll { get; set; } = false;
-
-            /// <summary>
-            /// 送信データ
-            /// </summary>
-            public byte[] SendData { get; set; } = new byte[1024];
-
-            /// <summary>
             /// 引数付きコンストラクタ
             /// </summary>
-            /// <param name="ip">受信先IP</param>
-            /// <param name="port">受信先ポート</param>
+            /// <param name="ip">受信元IP</param>
+            /// <param name="port">受信元ポート</param>
             /// <param name="receivedData">受信データ</param>
             internal ServerReceivedEventArgs(string ip, int port, byte[] receivedData)
             {
@@ -136,9 +133,17 @@ namespace ComTCP
             Backlog = listenBackLog;
             ReceiveTimeoutMillSec = receiveTimeoutMillSec;
 
+            // 接続待機のループ開始
+            RunningListen = true;
+
             TaskListen = Task.Factory.StartNew(() =>
             {
                 Run();
+            });
+
+            TaskPollSocket = Task.Factory.StartNew(() =>
+            {
+                PollSocket();
             });
         }
 
@@ -158,9 +163,6 @@ namespace ComTCP
 
                     // 接続待機開始
                     listenerSocket.Listen(Backlog);
-
-                    // 接続待機のループ開始
-                    RunningListen = true;
 
                     while (RunningListen)
                     {
@@ -231,7 +233,10 @@ namespace ComTCP
                     if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                     {
                         // 受信タイムアウト
-                        RemoveClientSocket(clientSocket);
+                        if (clientSocket != null && clientSocket.Connected)
+                        {
+                            RemoveClientSocket(clientSocket);
+                        }
 
                         break;
                     }
@@ -250,7 +255,10 @@ namespace ComTCP
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
 
-                RemoveClientSocket(clientSocket);
+                //if (clientSocket != null && clientSocket.Connected)
+                //{
+                //    RemoveClientSocket(clientSocket);
+                //}
             }
             finally
             {
@@ -283,27 +291,36 @@ namespace ComTCP
                 {
                     // 受信成功
                     state.IsReceived = true;
+
+                    var receivedData = new byte[bytes];
+                    Array.Copy(state.Buffer, 0, receivedData, 0, bytes);
+
+                    var serverIPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
+                    var serverReceivedEventArgs = new ServerReceivedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port, receivedData);
+
+                    bool isSendAll = false;
+                    byte[] sendData = null;
+                    // 受信イベント発生
+                    OnServerReceivedData?.Invoke(this, serverReceivedEventArgs, ref sendData, ref isSendAll);
+
+                    if (sendData != null)
+                    {
+                        if (isSendAll)
+                        {
+                            // 全接続済みクライアントへ送信
+                            SendAllClient(sendData);
+                        }
+                        else
+                        {
+                            // リクエストクライアントへ送信
+                            Send(clientSocket, sendData);
+                        }
+                    }
+
                     // 呼び出し元スレッドが完了するまで待機
                     while (state.IsReceiveTimeoutLoop)
                     {
                         Thread.Sleep(100);
-                    }
-
-                    var serverIPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
-                    var serverReceivedEventArgs = new ServerReceivedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port, state.Buffer);
-
-                    // 受信イベント発生
-                    OnServerReceivedData?.Invoke(this, serverReceivedEventArgs);
-
-                    if (serverReceivedEventArgs.IsSendAll)
-                    {
-                        // 全接続済みクライアントへ送信
-                        SendAllClient(serverReceivedEventArgs.SendData);
-                    }
-                    else
-                    {
-                        // リクエストクライアントへ送信
-                        Send(clientSocket, serverReceivedEventArgs.SendData);
                     }
 
                     // 非同期ソケットを開始して、受信する
@@ -319,7 +336,10 @@ namespace ComTCP
                         if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                         {
                             // 受信タイムアウト
-                            RemoveClientSocket(clientSocket);
+                            if (clientSocket != null && clientSocket.Connected)
+                            {
+                                RemoveClientSocket(clientSocket);
+                            }
 
                             break;
                         }
@@ -339,7 +359,10 @@ namespace ComTCP
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
 
-                RemoveClientSocket(clientSocket);
+                //if (clientSocket != null && clientSocket.Connected)
+                //{
+                //    RemoveClientSocket(clientSocket);
+                //}
             }
             finally
             {
@@ -398,7 +421,7 @@ namespace ComTCP
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
 
-                RemoveClientSocket(clientSocket);
+                //RemoveClientSocket(clientSocket);
             }
         }
 
@@ -426,20 +449,51 @@ namespace ComTCP
             // 待機スレッドが進行するようにシグナルをセット
             connectMre.Set();
 
+            // ポールソケットタスク終了
+            TaskPollSocket?.Wait();
+            TaskPollSocket?.Dispose();
+            TaskPollSocket = null;
+
             // リッスンタスク終了
             TaskListen?.Wait();
             TaskListen?.Dispose();
             TaskListen = null;
 
             // 保持しているすべての接続済みクライアント情報を削除
-            int index = ClientSockets.Count - 1;
-            while (index > -1)
-            {
-                var serverIPEndPoint = ClientSockets[index].RemoteEndPoint as IPEndPoint;
-                OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
+            //int index = ClientSockets.Count - 1;
+            //while (index > -1)
+            //{
+            //    var serverIPEndPoint = ClientSockets[index].RemoteEndPoint as IPEndPoint;
+            //    OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
 
-                ClientSockets.RemoveAt(index);
-                index--;
+            //    ClientSockets.RemoveAt(index);
+            //    index--;
+            //}
+        }
+
+        /// <summary>
+        /// ソケット状態を確認
+        /// 受信完了後、クライアントが切断されたときの対策
+        /// </summary>
+        private void PollSocket()
+        {
+            while (RunningListen)
+            {
+                var index = ClientSockets.Count - 1;
+                while (index > -1)
+                {
+                    if (!ClientSockets[index].Connected)
+                    {
+                        var serverIPEndPoint = ClientSockets[index].RemoteEndPoint as IPEndPoint;
+                        OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(serverIPEndPoint.Address.ToString(), serverIPEndPoint.Port));
+
+                        ClientSockets.RemoveAt(index);
+                    }
+
+                    index--;
+                }
+
+                Task.Delay(3000);
             }
         }
 

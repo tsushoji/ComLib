@@ -4,6 +4,7 @@ using Prism.Mvvm;
 using System;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -525,36 +526,60 @@ namespace ComLibDemo.ViewModels
 
         private void OnReceivedData(object sender, ClientReceivedEventArgs e)
         {
+            var receivedIP = e.IP;
+            var receivedPort = e.Port;
+            var receivedStr = Encoding.UTF8.GetString(e.ReceivedData);
+
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceivedData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:IP " + receivedIP));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:ポート " + receivedPort));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:送信バイト数 " + receivedStr));
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnReceivedData end"));
             }));
         }
 
         private void OnDisconnected(object sender, DisconnectedEventArgs e)
         {
+            var disconnectedIP = e.IP;
+            var disconnectedPort = e.Port;
+
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnDisconnected start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:IP " + disconnectedIP));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:ポート " + disconnectedPort));
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnDisconnected end"));
             }));
         }
 
         private void OnConnected(object sender, ConnectedEventArgs e)
         {
+            var connectedIP = e.IP;
+            var connectedPort = e.Port;
+
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:IP " + connectedIP));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:ポート " + connectedPort));
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnConnected end"));
             }));
         }
 
         private void OnSendData(object sender, SendEventArgs e)
         {
+            var sendIP = e.IP;
+            var sendPort = e.Port;
+            var sendByteNum = e.SendByteNum;
+
             Application.Current.Dispatcher.Invoke(new Action(() =>
             {
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnSendData start"));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:IP " + sendIP));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:ポート " + sendPort));
+                OutputMsgList.Add(new OutputTextModel(">>TCPClient:送信バイト数 " + sendByteNum));
                 OutputMsgList.Add(new OutputTextModel(">>TCPClient:OnSendData end"));
             }));
         }
