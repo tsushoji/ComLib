@@ -16,11 +16,6 @@ namespace ComTCP
         private Task TaskListen { get; set; }
 
         /// <summary>
-        /// ポールソケットタスク
-        /// </summary>
-        private Task TaskPollSocket { get; set; }
-
-        /// <summary>
         /// サーバーのエンドポイント
         /// </summary>
         private IPEndPoint IPEndPoint { get; set; }
@@ -420,13 +415,13 @@ namespace ComTCP
             connectMre.Set();
 
             // ポールソケットタスク終了
-            TaskPollSocket?.Wait();
-            TaskPollSocket?.Dispose();
+            TaskPollSocket.Wait();
+            TaskPollSocket.Dispose();
             TaskPollSocket = null;
 
             // リッスンタスク終了
-            TaskListen?.Wait();
-            TaskListen?.Dispose();
+            TaskListen.Wait();
+            TaskListen.Dispose();
             TaskListen = null;
 
             // 保持しているすべての接続済みクライアント情報を削除

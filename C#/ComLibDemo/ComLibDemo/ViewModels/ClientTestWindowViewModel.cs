@@ -6,7 +6,6 @@ using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using static ComTCP.TCPClient;
@@ -18,6 +17,7 @@ namespace ComLibDemo.ViewModels
     {
         public ObservableCollection<OutputTextModel> OutputMsgList { get; set; } = new ObservableCollection<OutputTextModel>();
 
+        private bool SurevConnectedDone { get; set; }
         public string InputSendIPTextBoxText { get; set; } = string.Empty;
 
         private bool _isEnabledInputSendIPTextBoxText = true;
@@ -264,7 +264,7 @@ namespace ComLibDemo.ViewModels
 
         private Task SurvConnectedTask { get; set; }
 
-        private bool IsSurvConnectedRunning { get; set; } = false;
+        private bool IsSurvConnectedRunning { get; set; }
 
         private EventInfo ReceivedDataEventInfo { get; set; }
 
@@ -282,7 +282,7 @@ namespace ComLibDemo.ViewModels
 
         private Delegate SendDataEventHandler { get; set; }
 
-        private bool _isEnabledClientConnectButton = false;
+        private bool _isEnabledClientConnectButton = true;
         public bool IsEnabledClientConnectButton
         {
             get
@@ -293,16 +293,10 @@ namespace ComLibDemo.ViewModels
             set
             {
                 SetProperty(ref _isEnabledClientConnectButton, value);
-
-                if (value)
-                {
-                    IsEnabledClientDisconnectButton = false;
-                    IsEnabledClientSendButton = false;
-                }
             }
         }
 
-        private bool _isEnabledClientDisconnectButton = false;
+        private bool _isEnabledClientDisconnectButton = true;
         public bool IsEnabledClientDisconnectButton
         {
             get
@@ -313,15 +307,10 @@ namespace ComLibDemo.ViewModels
             set
             {
                 SetProperty(ref _isEnabledClientDisconnectButton, value);
-
-                if (value)
-                {
-                    IsEnabledClientConnectButton = false;
-                }
             }
         }
 
-        private bool _isEnabledClientSendButton = false;
+        private bool _isEnabledClientSendButton = true;
         public bool IsEnabledClientSendButton
         {
             get
@@ -335,6 +324,8 @@ namespace ComLibDemo.ViewModels
             }
         }
 
+        public DelegateCommand Unloaded { get; private set; }
+
         public DelegateCommand ClientConnectClicked { get; private set; }
 
         public DelegateCommand ClientDisconnectClicked { get; private set; }
@@ -345,18 +336,20 @@ namespace ComLibDemo.ViewModels
         {
             if (ImportDll())
             {
-                ReceivedDataEventInfo = TCPClient.GetEvent("OnClientReceivedData");
-                DisconnectedEventInfo = TCPClient.GetEvent("OnClientDisconnected");
-                ConnectedEventInfo = TCPClient.GetEvent("OnClientConnected");
-                SendDataEventInfo = TCPClient.GetEvent("OnClientSendData");
                 SetEvent();
-
-                SetProperty(ref _isEnabledClientConnectButton, true);
+            }
+            else
+            {
+                IsEnabledClientConnectButton = false;
+                IsEnabledClientDisconnectButton = false;
+                IsEnabledClientSendButton = false;
             }
         }
 
         private void SetEvent()
         {
+            Unloaded = new DelegateCommand(OnUnload);
+
             ClientConnectClicked = new DelegateCommand(OnConnect);
             ClientDisconnectClicked = new DelegateCommand(OnDisconnect);
             ClientSendClicked = new DelegateCommand(OnSend);
@@ -365,6 +358,24 @@ namespace ComLibDemo.ViewModels
             DisconnectedEventHandler = new DisconnectedEventHandler(OnDisconnected);
             ConnectedEventHandler = new ConnectedEventHandler(OnConnected);
             SendDataEventHandler = new SendDataEventHandler(OnSendData);
+
+            ReceivedDataEventInfo = TCPClient.GetEvent("OnClientReceivedData");
+            DisconnectedEventInfo = TCPClient.GetEvent("OnClientDisconnected");
+            ConnectedEventInfo = TCPClient.GetEvent("OnClientConnected");
+            SendDataEventInfo = TCPClient.GetEvent("OnClientSendData");
+
+            ReceivedDataEventInfo.AddEventHandler(Client, ReceivedDataEventHandler);
+            DisconnectedEventInfo.AddEventHandler(Client, DisconnectedEventHandler);
+            ConnectedEventInfo.AddEventHandler(Client, ConnectedEventHandler);
+            SendDataEventInfo.AddEventHandler(Client, SendDataEventHandler);
+        }
+
+        private void OnUnload()
+        {
+            IsSurvConnectedRunning = false;
+            SurvConnectedTask?.Wait();
+            SurvConnectedTask?.Dispose();
+            SurvConnectedTask = null;
         }
 
         private bool ImportDll()
@@ -386,6 +397,8 @@ namespace ComLibDemo.ViewModels
 
         private void OnConnect()
         {
+            OutputMsgList.Add(new OutputTextModel(">>接続開始"));
+
             bool isValidate = true;
 
             string IP = InputSendIPTextBoxText;
@@ -433,11 +446,6 @@ namespace ComLibDemo.ViewModels
                 return;
             }
 
-            ReceivedDataEventInfo.AddEventHandler(Client, ReceivedDataEventHandler);
-            DisconnectedEventInfo.AddEventHandler(Client, DisconnectedEventHandler);
-            ConnectedEventInfo.AddEventHandler(Client, ConnectedEventHandler);
-            SendDataEventInfo.AddEventHandler(Client, SendDataEventHandler);
-
             if (Client.Connect(IP, port, connectTimeout, receiveTimeout, reTryNum))
             {
                 OutputMsgList.Add(new OutputTextModel(">>接続成功"));
@@ -450,9 +458,6 @@ namespace ComLibDemo.ViewModels
 
                 IsEnabledInputSendStringTextBoxText = true;
 
-                IsEnabledClientDisconnectButton = true;
-                IsEnabledClientSendButton = true;
-
                 IsSurvConnectedRunning = true;
                 SurvConnectedTask = Task.Factory.StartNew(() =>
                 {
@@ -461,13 +466,10 @@ namespace ComLibDemo.ViewModels
             }
             else
             {
-                ReceivedDataEventInfo.RemoveEventHandler(Client, ReceivedDataEventHandler);
-                DisconnectedEventInfo.RemoveEventHandler(Client, DisconnectedEventHandler);
-                ConnectedEventInfo.RemoveEventHandler(Client, ConnectedEventHandler);
-                SendDataEventInfo.RemoveEventHandler(Client, SendDataEventHandler);
-
                 OutputMsgList.Add(new OutputTextModel(">>接続失敗"));
             }
+
+            OutputMsgList.Add(new OutputTextModel(">>接続終了"));
         }
 
         private void SurvConnected()
@@ -476,14 +478,9 @@ namespace ComLibDemo.ViewModels
             {
                 if (!Client.IsConnected())
                 {
-                    ReceivedDataEventInfo.RemoveEventHandler(Client, ReceivedDataEventHandler);
-                    DisconnectedEventInfo.RemoveEventHandler(Client, DisconnectedEventHandler);
-                    ConnectedEventInfo.RemoveEventHandler(Client, ConnectedEventHandler);
-                    SendDataEventInfo.RemoveEventHandler(Client, SendDataEventHandler);
-
                     Application.Current.Dispatcher.Invoke(new Action(() =>
                     {
-                        OutputMsgList.Add(new OutputTextModel(">>切断"));
+                        OutputMsgList.Add(new OutputTextModel(">>監視 切断確認"));
                     }));
 
                     IsEnabledInputSendIPTextBoxText = true;
@@ -494,24 +491,39 @@ namespace ComLibDemo.ViewModels
 
                     IsReadOnlyInputSendStringTextBoxText = true;
 
-                    IsEnabledClientConnectButton = true;
-
                     break;
                 }
 
-                Thread.Sleep(100);
+                Task.Delay(5000);
             }
-
-            IsSurvConnectedRunning = false;
         }
 
         private void OnDisconnect()
         {
+            IsSurvConnectedRunning = false;
+            SurvConnectedTask?.Wait();
+
+            OutputMsgList.Add(new OutputTextModel(">>切断開始"));
+
             Client.DisConnect();
+
+            OutputMsgList.Add(new OutputTextModel(">>切断"));
+
+            IsEnabledInputSendIPTextBoxText = true;
+            IsEnabledInputSendPortTextBoxText = true;
+            IsEnabledInputConnectTimeoutTextBoxText = true;
+            IsEnabledInputReceiveTimeoutTextBoxText = true;
+            IsEnabledInputReTryNumTextBoxText = true;
+
+            IsReadOnlyInputSendStringTextBoxText = true;
+
+            OutputMsgList.Add(new OutputTextModel(">>切断終了"));
         }
 
         private void OnSend()
         {
+            OutputMsgList.Add(new OutputTextModel(">>送信開始"));
+
             string sendText = InputSendStringTextBoxText;
             byte[] sendData = System.Text.Encoding.UTF8.GetBytes(sendText);
             if (Client.Send(sendData))
@@ -522,6 +534,8 @@ namespace ComLibDemo.ViewModels
             {
                 OutputMsgList.Add(new OutputTextModel(">>送信失敗"));
             }
+
+            OutputMsgList.Add(new OutputTextModel(">>送信終了"));
         }
 
         private void OnReceivedData(object sender, ReceivedEventArgs e)

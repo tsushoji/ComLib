@@ -15,6 +15,11 @@ namespace ComTCP
         private readonly ManualResetEvent clientSendMre = new ManualResetEvent(false);
 
         /// <summary>
+        /// 受信タスク
+        /// </summary>
+        private Task TaskReceive { get; set; }
+
+        /// <summary>
         /// ソケット
         /// </summary>
         private Socket Socket { get; set; }
@@ -91,6 +96,7 @@ namespace ComTCP
         /// </summary>
         ~TCPClient()
         {
+            DisConnect();
             clientSendMre.Dispose();
             Buffer = null;
         }
@@ -138,13 +144,14 @@ namespace ComTCP
 
                     if (IsConnectDone)
                     {
-                        // 接続成功
-                        IsConnectDone = false;
-
-                        // 受信開始
-                        Task.Factory.StartNew(() =>
+                        TaskReceive = Task.Factory.StartNew(() =>
                         {
                             Receive();
+                        });
+
+                        TaskPollSocket = Task.Factory.StartNew(() =>
+                        {
+                            PollSocket();
                         });
 
                         return true;
@@ -164,9 +171,6 @@ namespace ComTCP
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
             }
-
-            // 切断
-            DisConnect();
 
             return false;
         }
@@ -248,10 +252,31 @@ namespace ComTCP
                     if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                     {
                         // 受信タイムアウト
-                        if (Socket != null && Socket.Connected)
+                        lock (SocketLockObj)
                         {
-                            DisConnect();
+                            try
+                            {
+                                if (Socket != null && Socket.Connected)
+                                {
+                                    OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+
+                                    Socket.Close();
+                                    Socket = null;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                                System.Diagnostics.Debug.WriteLine(ex.Message);
+                            }
                         }
+
+                        IsConnectDone = false;
+
+                        TaskPollSocket?.Wait();
+                        TaskPollSocket?.Dispose();
+                        TaskPollSocket = null;
+
                         break;
                     }
 
@@ -315,10 +340,33 @@ namespace ComTCP
                         if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                         {
                             // 受信タイムアウト
-                            if (Socket != null && Socket.Connected)
+                            IsConnectDone = false;
+
+                            lock (SocketLockObj)
                             {
-                                DisConnect();
+                                try
+                                {
+                                    if (Socket != null && Socket.Connected)
+                                    {
+                                        OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+
+                                        Socket.Close();
+                                        Socket = null;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                                    System.Diagnostics.Debug.WriteLine(ex.Message);
+                                }
                             }
+
+                            IsConnectDone = false;
+
+                            TaskPollSocket?.Wait();
+                            TaskPollSocket?.Dispose();
+                            TaskPollSocket = null;
+
                             break;
                         }
 
@@ -346,24 +394,32 @@ namespace ComTCP
         /// </summary>
         public void DisConnect()
         {
+            IsConnectTimeoutLoop = false;
+            IsReceiveTimeoutLoop = false;
+
+            IsConnectDone = false;
+            IsReceiveDone = false;
+
             try
             {
-                lock (SocketLockObj) 
+                TaskPollSocket?.Wait();
+                TaskPollSocket?.Dispose();
+                TaskPollSocket = null;
+
+                TaskReceive?.Wait();
+                TaskReceive?.Dispose();
+                TaskReceive = null;
+
+                lock (SocketLockObj)
                 {
-                    // ソケット終了
-                    Socket?.Shutdown(SocketShutdown.Both);
-                    Socket?.Disconnect(false);
-                    Socket?.Dispose();
-                    Socket = null;
+                    if (Socket != null && Socket.Connected)
+                    {
+                        OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+
+                        Socket.Close();
+                        Socket = null;
+                    }
                 }
-
-                IsConnectTimeoutLoop = false;
-                IsReceiveTimeoutLoop = false;
-
-                IsConnectDone = false;
-                IsReceiveDone = false;
-
-                OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
             }
             catch (Exception ex)
             {
@@ -379,23 +435,74 @@ namespace ComTCP
         /// <returns>送信可否</returns>
         public bool Send(byte[] data)
         {
+            lock (SocketLockObj)
+            {
+                try
+                {
+                    if (Socket != null && Socket.Connected)
+                    {
+                        var byteSize = Socket.Send(data);
+
+                        var clientIPEndPoint = (IPEndPoint)Socket.RemoteEndPoint;
+                        // 送信イベント発生
+                        OnClientSendData?.Invoke(this, new SendEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, byteSize));
+
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                    System.Diagnostics.Debug.WriteLine(ex.Message);
+
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// ソケット状態を確認
+        /// 接続完了後、クライアントが切断されたときの対策
+        /// </summary>
+        private void PollSocket()
+        {
             try
             {
-                var byteSize = Socket.Send(data);
+                while (IsConnectDone)
+                {
+                    lock (SocketLockObj)
+                    {
+                        try
+                        {
+                            if (Socket == null || !(Socket.Poll(1000000, SelectMode.SelectRead)) || !(Socket.Available == 0))
+                            {
+                                Task.Delay(5000);
+                                continue;
+                            }
 
-                var clientIPEndPoint = (IPEndPoint)Socket.RemoteEndPoint;
-                // 送信イベント発生
-                OnClientSendData?.Invoke(this, new SendEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, byteSize));
+                            // 接続完了後、サーバーから切断されたソケット検知
+                            OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+
+                            Socket.Close();
+                            Socket = null;
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                            System.Diagnostics.Debug.WriteLine(ex.Message);
+                        }
+                    }
+
+                    IsConnectDone = false;
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
                 System.Diagnostics.Debug.WriteLine(ex.Message);
-
-                return false;
             }
-
-            return true;
         }
 
         /// <summary>
@@ -404,26 +511,7 @@ namespace ComTCP
         /// <returns>接続されているとき、true それ以外のとき、false</returns>
         public bool IsConnected()
         {
-            lock (SocketLockObj)
-            {
-                if (Socket != null)
-                {
-                    if (!Socket.Connected)
-                    {
-                        return false;
-                    }
-
-                    if (Socket.Poll(1000000, SelectMode.SelectRead) && (Socket.Available == 0))
-                    {
-                        // 接続完了後、サーバーから切断されたソケット検知
-                        return false;
-                    }
-
-                    return true;
-                }
-            }
-
-            return false;
+            return IsConnectDone;
         }
     }
 }

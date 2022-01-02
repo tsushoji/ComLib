@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace ComTCP
 {
@@ -10,6 +11,11 @@ namespace ComTCP
         /// 接続スレッド待機用
         /// </summary>
         protected readonly ManualResetEvent connectMre = new ManualResetEvent(false);
+
+        /// <summary>
+        /// ポールソケットタスク
+        /// </summary>
+        protected Task TaskPollSocket { get; set; }
 
         /// <summary>
         /// 受信タイムアウトミリ秒

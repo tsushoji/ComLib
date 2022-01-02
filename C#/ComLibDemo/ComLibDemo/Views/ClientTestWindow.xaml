@@ -6,9 +6,17 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
         d:DataContext="{d:DesignInstance Type=viewmodels:ClientTestWindowViewModel}"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
         prism:ViewModelLocator.AutoWireViewModel="True"
         Title="ComLibDemo" Height="800" Width="600" WindowStartupLocation="CenterOwner">
+    
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Unloaded">
+            <i:InvokeCommandAction Command="{Binding Unloaded}"/>
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
+    
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="2*"/>
