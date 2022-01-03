@@ -235,7 +235,7 @@ namespace ComTCP
         /// <summary>
         /// 受信
         /// </summary>
-        public void Receive()
+        private void Receive()
         {
             try
             {
