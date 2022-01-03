@@ -10,17 +10,16 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace ComApp
+namespace ComLibDemo.Views
 {
     /// <summary>
-    /// MainWindow.xaml の相互作用ロジック
+    /// ServerTestWindow.xaml の相互作用ロジック
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class ServerTestWindow : Window
     {
-        public MainWindow()
+        public ServerTestWindow()
         {
             InitializeComponent();
         }
