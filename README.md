@@ -6,4 +6,4 @@
 <https://github.com/tsushoji/ComLib/tree/main/C%23>
 
 * バイナリーファイル  
-ComLib/C#/Library/ver1_0_0  
+ComLib/C#/Library/Ver1-0-0  
