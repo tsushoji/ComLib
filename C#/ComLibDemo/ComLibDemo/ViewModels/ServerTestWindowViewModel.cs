@@ -253,10 +253,10 @@ namespace ComLibDemo.ViewModels
                 isValidate = false;
             }
 
-            int receiveTimeout;
-            if (!ParseHelper.TryParsePositeviNumStr(InputReceiveTimeoutTextBoxText, out receiveTimeout))
+            int receiveTimeout = 0;
+            if (!string.IsNullOrEmpty(InputReceiveTimeoutTextBoxText) && !int.TryParse(InputReceiveTimeoutTextBoxText, out receiveTimeout))
             {
-                OutputMsgList.Add(new OutputTextModel(">>正の数で受信タイムアウトを設定してください。"));
+                OutputMsgList.Add(new OutputTextModel(">>整数で受信タイムアウトを設定してください。"));
 
                 isValidate = false;
             }

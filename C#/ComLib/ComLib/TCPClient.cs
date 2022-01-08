@@ -110,7 +110,7 @@ namespace ComTCP
         /// <param name="receiveTimeoutMillSec">受信タイムアウトミリ秒</param>
         /// <param name="reTryNum">リトライ回数</param>
         /// <returns>接続可否</returns>
-        public bool Connect(string ip, int port, int connectTimeoutMillSec, int receiveTimeoutMillSec, int reTryNum)
+        public bool Connect(string ip, int port, int connectTimeoutMillSec = 0, int receiveTimeoutMillSec = 0, int reTryNum = 0)
         {
             ConnectTimeoutMillSec = connectTimeoutMillSec;
             ReceiveTimeoutMillSec = receiveTimeoutMillSec;
@@ -186,27 +186,55 @@ namespace ComTCP
                 // ソケットを取得
                 var clientSocket = asyncResult.AsyncState as Socket;
 
-                IsConnectTimeoutLoop = true;
-
-                var start = DateTime.Now;
-
-                // 接続タイムアウト処理
-                while (IsConnectTimeoutLoop)
+                if (ConnectTimeoutMillSec > 0)
                 {
-                    if (DateTime.Now - start > TimeSpan.FromMilliseconds(ConnectTimeoutMillSec))
+                    // 接続タイムアウト処理
+                    IsConnectTimeoutLoop = true;
+                    var start = DateTime.Now;
+
+                    while (IsConnectTimeoutLoop)
                     {
-                        // 接続タイムアウト
-                        break;
+                        if (DateTime.Now - start > TimeSpan.FromMilliseconds(ConnectTimeoutMillSec))
+                        {
+                            // 接続タイムアウト
+                            break;
+                        }
+
+                        if (clientSocket.Connected)
+                        {
+                            // 接続成功
+                            IsConnectTimeoutLoop = false;
+                            IsConnectDone = true;
+
+                            // 待機スレッドが進行するようにシグナルをセット
+                            connectMre.Set();
+
+                            // 非同期ソケットを終了
+                            // 保留中のスレッドを待機させたまま、呼び出すとエラーになるため、上記で待機スレッド進行
+                            clientSocket.EndConnect(asyncResult);
+
+                            // 接続イベント発生
+                            OnClientConnected?.Invoke(this, new ConnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+
+                            return;
+                        }
                     }
+
+                    // 接続失敗
+                    IsConnectTimeoutLoop = false;
+
+                    // 待機スレッドが進行するようにシグナルをセット
+                    connectMre.Set();
+                }
+                else
+                {
+                    // 待機スレッドが進行するようにシグナルをセット
+                    connectMre.Set();
 
                     if (clientSocket.Connected)
                     {
                         // 接続成功
-                        IsConnectTimeoutLoop = false;
                         IsConnectDone = true;
-
-                        // 待機スレッドが進行するようにシグナルをセット
-                        connectMre.Set();
 
                         // 非同期ソケットを終了
                         // 保留中のスレッドを待機させたまま、呼び出すとエラーになるため、上記で待機スレッド進行
@@ -214,16 +242,9 @@ namespace ComTCP
 
                         // 接続イベント発生
                         OnClientConnected?.Invoke(this, new ConnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
-
-                        return;
                     }
                 }
 
-                // 接続失敗
-                IsConnectTimeoutLoop = false;
-
-                // 待機スレッドが進行するようにシグナルをセット
-                connectMre.Set();
             }
             catch (Exception ex)
             {
@@ -242,48 +263,50 @@ namespace ComTCP
                 // 非同期ソケットを開始して、受信する
                 IAsyncResult asyncResult = Socket.BeginReceive(Buffer, 0, BufferSize, 0, new AsyncCallback(ReceiveCallback), Socket);
 
-                IsReceiveTimeoutLoop = true;
-
-                var start = DateTime.Now;
-
-                // 受信タイムアウト処理
-                while (IsReceiveTimeoutLoop)
+                if (ReceiveTimeoutMillSec > 0)
                 {
-                    if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
-                    {
-                        // 受信タイムアウト
-                        lock (SocketLockObj)
-                        {
-                            try
-                            {
-                                if (Socket != null && Socket.Connected)
-                                {
-                                    OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+                    // 受信タイムアウト処理
+                    IsReceiveTimeoutLoop = true;
+                    var start = DateTime.Now;
 
-                                    Socket.Close();
-                                    Socket = null;
+                    while (IsReceiveTimeoutLoop)
+                    {
+                        if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                        {
+                            // 受信タイムアウト
+                            lock (SocketLockObj)
+                            {
+                                try
+                                {
+                                    if (Socket != null && Socket.Connected)
+                                    {
+                                        OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+
+                                        Socket.Close();
+                                        Socket = null;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                                    System.Diagnostics.Debug.WriteLine(ex.Message);
                                 }
                             }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
-                                System.Diagnostics.Debug.WriteLine(ex.Message);
-                            }
+
+                            IsConnectDone = false;
+
+                            TaskPollSocket?.Wait();
+                            TaskPollSocket?.Dispose();
+                            TaskPollSocket = null;
+
+                            break;
                         }
 
-                        IsConnectDone = false;
-
-                        TaskPollSocket?.Wait();
-                        TaskPollSocket?.Dispose();
-                        TaskPollSocket = null;
-
-                        break;
-                    }
-
-                    if (IsReceiveDone)
-                    {
-                        // 受信成功
-                        break;
+                        if (IsReceiveDone)
+                        {
+                            // 受信成功
+                            break;
+                        }
                     }
                 }
             }
@@ -329,51 +352,54 @@ namespace ComTCP
                     // 非同期ソケットを開始して、受信する
                     IAsyncResult asyncResultCallback = socket.BeginReceive(Buffer, 0, BufferSize, 0, new AsyncCallback(ReceiveCallback), Socket);
 
-                    IsReceiveTimeoutLoop = true;
                     IsReceiveDone = false;
 
-                    var start = DateTime.Now;
-
-                    // 受信タイムアウト処理
-                    while (IsReceiveTimeoutLoop)
+                    if (ReceiveTimeoutMillSec > 0)
                     {
-                        if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                        // 受信タイムアウト処理
+                        IsReceiveTimeoutLoop = true;
+                        var start = DateTime.Now;
+
+                        while (IsReceiveTimeoutLoop)
                         {
-                            // 受信タイムアウト
-                            IsConnectDone = false;
-
-                            lock (SocketLockObj)
+                            if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                             {
-                                try
-                                {
-                                    if (Socket != null && Socket.Connected)
-                                    {
-                                        OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+                                // 受信タイムアウト
+                                IsConnectDone = false;
 
-                                        Socket.Close();
-                                        Socket = null;
+                                lock (SocketLockObj)
+                                {
+                                    try
+                                    {
+                                        if (Socket != null && Socket.Connected)
+                                        {
+                                            OnClientDisconnected?.Invoke(this, new DisconnectedEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port));
+
+                                            Socket.Close();
+                                            Socket = null;
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
+                                        System.Diagnostics.Debug.WriteLine(ex.Message);
                                     }
                                 }
-                                catch (Exception ex)
-                                {
-                                    System.Diagnostics.Debug.WriteLine(MethodBase.GetCurrentMethod().Name);
-                                    System.Diagnostics.Debug.WriteLine(ex.Message);
-                                }
+
+                                IsConnectDone = false;
+
+                                TaskPollSocket?.Wait();
+                                TaskPollSocket?.Dispose();
+                                TaskPollSocket = null;
+
+                                break;
                             }
 
-                            IsConnectDone = false;
-
-                            TaskPollSocket?.Wait();
-                            TaskPollSocket?.Dispose();
-                            TaskPollSocket = null;
-
-                            break;
-                        }
-
-                        if (IsReceiveDone)
-                        {
-                            // 受信成功
-                            break;
+                            if (IsReceiveDone)
+                            {
+                                // 受信成功
+                                break;
+                            }
                         }
                     }
                 }
