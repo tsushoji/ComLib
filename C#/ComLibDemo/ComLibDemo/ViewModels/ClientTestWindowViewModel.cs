@@ -417,26 +417,26 @@ namespace ComLibDemo.ViewModels
                 isValidate = false;
             }
 
-            int connectTimeout;
-            if (!ParseHelper.TryParsePositeviNumStr(InputConnectTimeoutTextBoxText, out connectTimeout))
+            int connectTimeout = 0;
+            if (!string.IsNullOrEmpty(InputConnectTimeoutTextBoxText) && !int.TryParse(InputConnectTimeoutTextBoxText, out connectTimeout))
             {
-                OutputMsgList.Add(new OutputTextModel(">>正の数で接続タイムアウトを設定してください。"));
+                OutputMsgList.Add(new OutputTextModel(">>整数で接続タイムアウトを設定してください。"));
 
                 isValidate = false;
             }
 
-            int receiveTimeout;
-            if (!ParseHelper.TryParsePositeviNumStr(InputReceiveTimeoutTextBoxText, out receiveTimeout))
+            int receiveTimeout = 0;
+            if (!string.IsNullOrEmpty(InputReceiveTimeoutTextBoxText) && !int.TryParse(InputReceiveTimeoutTextBoxText, out receiveTimeout))
             {
-                OutputMsgList.Add(new OutputTextModel(">>正の数で受信タイムアウトを設定してください。"));
+                OutputMsgList.Add(new OutputTextModel(">>整数で受信タイムアウトを設定してください。"));
 
                 isValidate = false;
             }
 
-            int reTryNum;
-            if (!ParseHelper.TryParsePositeviNumStr(InputReTryNumTextBoxText, out reTryNum))
+            int reTryNum = 0;
+            if (!string.IsNullOrEmpty(InputReTryNumTextBoxText) && !int.TryParse(InputReTryNumTextBoxText, out reTryNum))
             {
-                OutputMsgList.Add(new OutputTextModel(">>正の数でリトライ回数を設定してください。"));
+                OutputMsgList.Add(new OutputTextModel(">>整数でリトライ回数を設定してください。"));
 
                 isValidate = false;
             }
@@ -507,7 +507,7 @@ namespace ComLibDemo.ViewModels
 
             Client.DisConnect();
 
-            OutputMsgList.Add(new OutputTextModel(">>切断"));
+            OutputMsgList.Add(new OutputTextModel(">>切断成功"));
 
             IsEnabledInputSendIPTextBoxText = true;
             IsEnabledInputSendPortTextBoxText = true;

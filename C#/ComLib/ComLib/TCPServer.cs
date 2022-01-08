@@ -89,7 +89,7 @@ namespace ComTCP
         /// </summary>
         /// <param name="listenBackLog">acceptされていないクライアントからの接続要求を保持しておくキューの最大長</param>
         /// <param name="receiveTimeoutMillSec">受信タイムアウトミリ秒</param>
-        public void StartService(int listenBackLog, int receiveTimeoutMillSec)
+        public void StartService(int listenBackLog, int receiveTimeoutMillSec = 0)
         {
             Backlog = listenBackLog;
             ReceiveTimeoutMillSec = receiveTimeoutMillSec;
@@ -182,42 +182,49 @@ namespace ComTCP
                 state = new StateObject
                 {
                     ClientSocket = clientSocket,
-                    IsReceiveTimeoutLoop = true,
                     IsReceived = false
                 };
+
+                if (ReceiveTimeoutMillSec > 0)
+                {
+                    state.IsReceiveTimeoutLoop = true;
+                }
 
                 // 非同期ソケットを開始して、受信する
                 clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
 
-                var start = DateTime.Now;
-
-                // 受信タイムアウト処理
-                while (state.IsReceiveTimeoutLoop)
+                if (ReceiveTimeoutMillSec > 0)
                 {
-                    if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
-                    {
-                        // 受信タイムアウト
-                        if (clientSocket != null && clientSocket.Connected)
-                        {
-                            lock (SocketLockObj)
-                            {
-                                var IPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
-                                OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(IPEndPoint.Address.ToString(), IPEndPoint.Port));
+                    // 受信タイムアウト処理
+                    var start = DateTime.Now;
 
-                                clientSocket.Close();
-                                ClientSockets.Remove(clientSocket);
+                    while (state.IsReceiveTimeoutLoop)
+                    {
+                        if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                        {
+                            // 受信タイムアウト
+                            if (clientSocket != null && clientSocket.Connected)
+                            {
+                                lock (SocketLockObj)
+                                {
+                                    var IPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
+                                    OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(IPEndPoint.Address.ToString(), IPEndPoint.Port));
+
+                                    clientSocket.Close();
+                                    ClientSockets.Remove(clientSocket);
+                                }
                             }
+
+                            break;
                         }
 
-                        break;
-                    }
+                        if (state.IsReceived)
+                        {
+                            // 受信成功
+                            state.IsReceived = false;
 
-                    if (state.IsReceived)
-                    {
-                        // 受信成功
-                        state.IsReceived = false;
-
-                        break;
+                            break;
+                        }
                     }
                 }
             }
@@ -289,39 +296,45 @@ namespace ComTCP
                         Thread.Sleep(100);
                     }
 
+                    if (ReceiveTimeoutMillSec > 0)
+                    {
+                        state.IsReceiveTimeoutLoop = true;
+                    }
+
                     // 非同期ソケットを開始して、受信する
                     clientSocket.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
 
-                    var start = DateTime.Now;
-
-                    state.IsReceiveTimeoutLoop = true;
-
-                    // 受信タイムアウト処理
-                    while (state.IsReceiveTimeoutLoop)
+                    if (ReceiveTimeoutMillSec > 0)
                     {
-                        if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
+                        // 受信タイムアウト処理
+                        var start = DateTime.Now;
+
+                        while (state.IsReceiveTimeoutLoop)
                         {
-                            // 受信タイムアウト
-                            if (clientSocket != null && clientSocket.Connected)
+                            if (DateTime.Now - start > TimeSpan.FromMilliseconds(ReceiveTimeoutMillSec))
                             {
-                                lock (SocketLockObj)
+                                // 受信タイムアウト
+                                if (clientSocket != null && clientSocket.Connected)
                                 {
-                                    var IPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
-                                    OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(IPEndPoint.Address.ToString(), IPEndPoint.Port));
-                                    clientSocket.Close();
-                                    ClientSockets.Remove(clientSocket);
+                                    lock (SocketLockObj)
+                                    {
+                                        var IPEndPoint = clientSocket.RemoteEndPoint as IPEndPoint;
+                                        OnServerDisconnected?.Invoke(this, new DisconnectedEventArgs(IPEndPoint.Address.ToString(), IPEndPoint.Port));
+                                        clientSocket.Close();
+                                        ClientSockets.Remove(clientSocket);
+                                    }
                                 }
+
+                                break;
                             }
 
-                            break;
-                        }
+                            if (state.IsReceived)
+                            {
+                                // 受信成功
+                                state.IsReceived = false;
 
-                        if (state.IsReceived)
-                        {
-                            // 受信成功
-                            state.IsReceived = false;
-
-                            break;
+                                break;
+                            }
                         }
                     }
                 }
