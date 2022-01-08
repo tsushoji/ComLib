@@ -1,21 +1,74 @@
 # ComLib  
+## Release Ver1.1.0  
+### 概要  
+TCPClient、Serverメソッド引数制約追加
+### 更新事項  
+・以下、「表1-1-1」メソッド制約を追加。
+
+<table>
+  <tr>
+    <th width="50">No</th>
+    <th width="150">ファイル名</th>
+    <th width="100">クラス名</th>
+    <th width="100">メソッド名</th>
+    <th width="250">引数</th>
+    <th width="350">制約</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>ComLib.dll</td>
+    <td>TCPClient</td>
+    <td>Connect</td>
+    <td>int 接続タイムアウトミリ秒</td>
+    <td>1以上の値を引数に渡すとき、値ミリ秒タイムアウトを行う。<br>1より小さい値を引数に渡すまたは引数を渡さないとき、タイムアウトを行わない。</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>ComLib.dll</td>
+    <td>TCPClient</td>
+    <td>Connect</td>
+    <td>int 受信タイムアウトミリ秒</td>
+    <td>1以上の値を引数に渡すとき、値ミリ秒タイムアウトを行う。<br>1より小さい値を引数に渡すまたは引数を渡さないとき、タイムアウトを行わない。</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>ComLib.dll</td>
+    <td>TCPClient</td>
+    <td>Connect</td>
+    <td>int 接続トライ回数</td>
+    <td>1以上の値を引数に渡すとき、値回数接続リトライを行う。<br>1より小さい値を引数に渡すまたは引数を渡さないとき、接続リトライを行わない。</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>ComLib.dll</td>
+    <td>TCPServer</td>
+    <td>StartService</td>
+    <td>int 受信タイムアウトミリ秒</td>
+    <td>1以上の値を引数に渡すとき、値ミリ秒タイムアウトを行う。<br>1より小さい値を引数に渡すまたは引数を渡さないとき、タイムアウトを行わない。</td>
+  </tr>
+</table>
+
+  
 ## Release Ver1.0.0  
 ### 概要  
 TCP通信クライアント、サーバークラスライブラリーを作成。  
 ※TCPサーバーは1(サーバー)対多(クライアント)に対応。  
 ※バイナリーデータをクライアントとサーバーで通信する。  
 ### 更新事項
-* 以下、インターフェースを追加。  
+* 以下、「表1-0-0-1」インターフェースを追加。  
 
 <table>
   <tr>
+    <th width="50">No</th>
     <th width="150">ファイル名</th>
     <th width="100">クラス名</th>
     <th width="100">メソッド名</th>
     <th width="250">引数</th>
     <th width="350">戻り値</th>
-    <th width="400">説明</th></tr>
+    <th width="350">説明</th>
+  </tr>
   <tr>
+    <td>1</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>Connect</td>
@@ -24,6 +77,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>引数で指定した条件でサーバーへ接続</td>
   </tr>
   <tr>
+    <td>2</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>DisConnect</td>
@@ -32,6 +86,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>サーバーとの接続を切断する</td>
   </tr>
   <tr>
+    <td>3</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>Send</td>
@@ -40,6 +95,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>指定したバイナリーデータを接続したサーバーへ送信</td>
   </tr>
   <tr>
+    <td>4</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>IsConnected</td>
@@ -48,6 +104,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>クライアントとサーバーの接続状態を取得</td>
   </tr>
   <tr>
+    <td>5</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>StartService</td>
@@ -56,6 +113,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>サーバー処理を開始</td>
   </tr>
   <tr>
+    <td>6</td>
     <td>ComLib.dll</td>
     <td>TCPServer</td>
     <td>EndService</td>
@@ -64,6 +122,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>サーバー処理終了</td>
   </tr>
   <tr>
+    <td>7</td>
     <td>ComLib.dll</td>
     <td>TCPServer</td>
     <td>IsServiceRunning</td>
@@ -73,10 +132,11 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
   </tr>
 </table>
 
-* 以下、完了イベントを追加。  
+* 以下、「表1-0-0-2」完了イベントを追加。  
 
 <table>
   <tr>
+    <th width="50">No</th>
     <th width="120">ファイル名</th>
     <th width="80">クラス名</th>
     <th width="60">メソッド名</th>
@@ -86,6 +146,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <th width="150">説明</th>
   </tr>
   <tr>
+    <td>1</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>OnClientConnected</td>
@@ -95,6 +156,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>クライアント接続完了イベント</td>
   </tr>
   <tr>
+    <td>2</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>OnClientSendData</td>
@@ -104,6 +166,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>クライアント送信完了イベント</td>
   </tr>
   <tr>
+    <td>3</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>OnClientDisconnected</td>
@@ -113,6 +176,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>クライアント切断完了イベント</td>
   </tr>
   <tr>
+    <td>4</td>
     <td>ComLib.dll</td>
     <td>TCPClient</td>
     <td>OnClientReceivedData</td>
@@ -122,6 +186,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>クライアント受信完了イベント</td>
   </tr>
   <tr>
+    <td>5</td>
     <td>ComLib.dll</td>
     <td>TCPServer</td>
     <td>OnServerReceivedData</td>
@@ -131,6 +196,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>サーバー受信完了イベント</td>
   </tr>
   <tr>
+    <td>6</td>
     <td>ComLib.dll</td>
     <td>TCPServer</td>
     <td>OnServerDisconnected</td>
@@ -140,6 +206,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>サーバー切断完了イベント</td>
   </tr>
   <tr>
+    <td>7</td>
     <td>ComLib.dll</td>
     <td>TCPServer</td>
     <td>OnServerConnected</td>
@@ -149,6 +216,7 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
     <td>サーバー接続完了イベント</td>
   </tr>
   <tr>
+    <td>8</td>
     <td>ComLib.dll</td>
     <td>TCPServer</td>
     <td>OnServerSendData</td>
@@ -163,6 +231,6 @@ TCP通信クライアント、サーバークラスライブラリーを作成�
 ※イベント登録方法については以下プロジェクト参照。  
 <https://github.com/tsushoji/ComLib/tree/main/C%23/ComLibDemo>  
 
-* 以下、完了イベントデータクラスとする。
+* 以下、「UML1-0-0-1」完了イベントデータクラスとする。
 
 ![完了イベントデータクラス図](Doc/README/Ver1-0-0/img/001.png)
