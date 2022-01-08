@@ -446,7 +446,7 @@ namespace ComLibDemo.ViewModels
                 return;
             }
 
-            if (Client.Connect(IP, port, connectTimeout, receiveTimeout, reTryNum))
+            if (Client.ConnectToServerAsync(IP, port, connectTimeout, receiveTimeout, reTryNum))
             {
                 OutputMsgList.Add(new OutputTextModel(">>接続成功"));
 
@@ -476,7 +476,7 @@ namespace ComLibDemo.ViewModels
         {
             while (IsSurvConnectedRunning)
             {
-                if (!Client.IsConnected())
+                if (!Client.IsClientConnected())
                 {
                     Application.Current.Dispatcher.Invoke(new Action(() =>
                     {
@@ -505,7 +505,7 @@ namespace ComLibDemo.ViewModels
 
             OutputMsgList.Add(new OutputTextModel(">>切断開始"));
 
-            Client.DisConnect();
+            Client.DisConnectServer();
 
             OutputMsgList.Add(new OutputTextModel(">>切断成功"));
 
@@ -526,7 +526,7 @@ namespace ComLibDemo.ViewModels
 
             string sendText = InputSendStringTextBoxText;
             byte[] sendData = System.Text.Encoding.UTF8.GetBytes(sendText);
-            if (Client.Send(sendData))
+            if (Client.SendToServer(sendData))
             {
                 OutputMsgList.Add(new OutputTextModel(">>送信成功"));
             }

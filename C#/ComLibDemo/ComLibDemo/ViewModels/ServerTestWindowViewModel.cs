@@ -283,7 +283,7 @@ namespace ComLibDemo.ViewModels
             SendDataEventInfo = TCPServer.GetEvent("OnServerSendData");
             SendDataEventInfo.AddEventHandler(ServerService, SendDataEventHandler);
 
-            ServerService.StartService(listenBackLog, receiveTimeout);
+            ServerService.StartServerAsync(listenBackLog, receiveTimeout);
 
             OutputMsgList.Add(new OutputTextModel(">>サーバー処理開始"));
 
@@ -377,7 +377,7 @@ namespace ComLibDemo.ViewModels
 
         private void OnEndService()
         {
-            ServerService.EndService();
+            ServerService.EndServer();
 
             ReceivedDataEventInfo.RemoveEventHandler(ServerService, ReceivedDataEventHandler);
             ReceivedDataEventInfo = null;

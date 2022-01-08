@@ -1,9 +1,61 @@
 # ComLib  
+## Release Ver2.1.0  
+### 概要  
+TCPClient、Serverメソッド名変更
+### 更新事項  
+・以下、「表2-1-0-1」のようにメソッド名変更。  
+
+<table>
+  <tr>
+    <th width="50">No</th>
+    <th width="300">変更前メソッド名</th>
+    <th width="300">変更後メソッド名</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>Connect</td>
+    <td>ConnectToServerAsync</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>DisConnect</td>
+    <td>DisConnectServer</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>Send</td>
+    <td>SendToServer</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>IsConnected</td>
+    <td>IsClientConnected</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>StartService</td>
+    <td>StartServerAsync</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td>EndService</td>
+    <td>EndServer</td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td>IsServiceRunning</td>
+    <td>IsServerRunning</td>
+  </tr>
+</table>
+
+※上記変更前メソッド名については「表1-0-0-1」を参照
+
+
 ## Release Ver1.1.0  
 ### 概要  
 TCPClient、Serverメソッド引数制約追加
 ### 更新事項  
-・以下、「表1-1-1」メソッド制約を追加。
+・以下、「表1-1-0-1」メソッド制約を追加。
 
 <table>
   <tr>
