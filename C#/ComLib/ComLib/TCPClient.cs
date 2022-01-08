@@ -96,7 +96,7 @@ namespace ComTCP
         /// </summary>
         ~TCPClient()
         {
-            DisConnect();
+            DisConnectServer();
             clientSendMre.Dispose();
             Buffer = null;
         }
@@ -110,7 +110,7 @@ namespace ComTCP
         /// <param name="receiveTimeoutMillSec">受信タイムアウトミリ秒</param>
         /// <param name="reTryNum">リトライ回数</param>
         /// <returns>接続可否</returns>
-        public bool Connect(string ip, int port, int connectTimeoutMillSec = 0, int receiveTimeoutMillSec = 0, int reTryNum = 0)
+        public bool ConnectToServerAsync(string ip, int port, int connectTimeoutMillSec = 0, int receiveTimeoutMillSec = 0, int reTryNum = 0)
         {
             ConnectTimeoutMillSec = connectTimeoutMillSec;
             ReceiveTimeoutMillSec = receiveTimeoutMillSec;
@@ -138,7 +138,7 @@ namespace ComTCP
 
                     connectMre.Reset();
                     // 非同期ソケットを開始して、接続する
-                    IAsyncResult asyncResult = Socket.BeginConnect(ServerIPEndPoint, new AsyncCallback(ConnectCallback), Socket);
+                    IAsyncResult asyncResult = Socket.BeginConnect(ServerIPEndPoint, new AsyncCallback(BeginConnectFromServer), Socket);
                     // 接続コールバック処理が完了するまでスレッドを待機
                     connectMre.WaitOne();
 
@@ -146,12 +146,12 @@ namespace ComTCP
                     {
                         TaskReceive = Task.Factory.StartNew(() =>
                         {
-                            Receive();
+                            BeginReadFromServerAsync();
                         });
 
                         TaskPollSocket = Task.Factory.StartNew(() =>
                         {
-                            PollSocket();
+                            PollServer();
                         });
 
                         return true;
@@ -179,7 +179,7 @@ namespace ComTCP
         /// 接続時の非同期コールバック処理
         /// </summary>
         /// <param name="asyncResult">接続結果</param>
-        private void ConnectCallback(IAsyncResult asyncResult)
+        private void BeginConnectFromServer(IAsyncResult asyncResult)
         {
             try
             {
@@ -256,12 +256,12 @@ namespace ComTCP
         /// <summary>
         /// 受信
         /// </summary>
-        private void Receive()
+        private void BeginReadFromServerAsync()
         {
             try
             {
                 // 非同期ソケットを開始して、受信する
-                IAsyncResult asyncResult = Socket.BeginReceive(Buffer, 0, BufferSize, 0, new AsyncCallback(ReceiveCallback), Socket);
+                IAsyncResult asyncResult = Socket.BeginReceive(Buffer, 0, BufferSize, 0, new AsyncCallback(ReadFromServerAsync), Socket);
 
                 if (ReceiveTimeoutMillSec > 0)
                 {
@@ -325,7 +325,7 @@ namespace ComTCP
         /// データ受信時の非同期コールバック処理
         /// </summary>
         /// <param name="asyncResult">受信結果</param>
-        private void ReceiveCallback(IAsyncResult asyncResult)
+        private void ReadFromServerAsync(IAsyncResult asyncResult)
         {
             try
             {
@@ -350,7 +350,7 @@ namespace ComTCP
                     }
 
                     // 非同期ソケットを開始して、受信する
-                    IAsyncResult asyncResultCallback = socket.BeginReceive(Buffer, 0, BufferSize, 0, new AsyncCallback(ReceiveCallback), Socket);
+                    IAsyncResult asyncResultCallback = socket.BeginReceive(Buffer, 0, BufferSize, 0, new AsyncCallback(ReadFromServerAsync), Socket);
 
                     IsReceiveDone = false;
 
@@ -418,7 +418,7 @@ namespace ComTCP
         /// <summary>
         /// 切断
         /// </summary>
-        public void DisConnect()
+        public void DisConnectServer()
         {
             IsConnectTimeoutLoop = false;
             IsReceiveTimeoutLoop = false;
@@ -459,7 +459,7 @@ namespace ComTCP
         /// </summary>
         /// <param name="data">データ</param>
         /// <returns>送信可否</returns>
-        public bool Send(byte[] data)
+        public bool SendToServer(byte[] data)
         {
             lock (SocketLockObj)
             {
@@ -492,7 +492,7 @@ namespace ComTCP
         /// ソケット状態を確認
         /// 接続完了後、クライアントが切断されたときの対策
         /// </summary>
-        private void PollSocket()
+        private void PollServer()
         {
             try
             {
@@ -535,7 +535,7 @@ namespace ComTCP
         /// 接続されているか
         /// </summary>
         /// <returns>接続されているとき、true それ以外のとき、false</returns>
-        public bool IsConnected()
+        public bool IsClientConnected()
         {
             return IsConnectDone;
         }
