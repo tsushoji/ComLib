@@ -1,4 +1,11 @@
 # ComLib  
+## Release Ver2.1.1  
+### 概要  
+TCPClientリファクタリング
+### 更新事項  
+・「表2-1-0-1」の「No.3」メソッド内部処理変更。  
+
+
 ## Release Ver2.1.0  
 ### 概要  
 TCPClient、Serverメソッド名変更
