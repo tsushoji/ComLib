@@ -469,7 +469,6 @@ namespace ComTCP
                     {
                         var byteSize = Socket.Send(data);
 
-                        var clientIPEndPoint = (IPEndPoint)Socket.RemoteEndPoint;
                         // 送信イベント発生
                         OnClientSendData?.Invoke(this, new SendEventArgs(ServerIPEndPoint.Address.ToString(), ServerIPEndPoint.Port, byteSize));
 
